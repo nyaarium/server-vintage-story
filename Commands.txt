@@ -13,7 +13,9 @@ Allowing a person to reset their class:
 Then they have to type:
 .charsel
 
-Other gameplay settings:
+Other settings:
+/serverconfig setspawnhere
+/serverconfig spawncapplayerscaling 1
 /worldConfig propickNodeSearchRadius 6
 /worldconfig deathPunishment keep
 /worldConfig playerHealthPoints 20
