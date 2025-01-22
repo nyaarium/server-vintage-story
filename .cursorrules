@@ -1,0 +1,19 @@
+## Commands:
+
+Start server: `start.sh`
+
+Run to bash: `run.sh`
+
+Update mods: `update.sh`
+
+## Files:
+
+`data/` contains the server data.
+
+`docker/` contains the server Docker.
+
+`docker/monitor/` is a small Node.js app that runs within the docker container and monitors the server.
+
+`docker/mod-updater.js` is a small Node.js app that runs within the docker container and updates the mods.
+
+`docker/start-docker-server.sh` is the main script that runs within the docker container and starts the server + monitor.

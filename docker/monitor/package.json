@@ -1,0 +1,10 @@
+{
+	"name": "monitor-server",
+	"dependencies": {
+		"cross-spawn": "^7.0.3",
+		"express": "^4.21.1",
+		"helmet": "^7.2.0",
+		"json5": "^2.2.3",
+		"moment": "^2.30.1"
+	}
+}

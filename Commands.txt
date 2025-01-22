@@ -1,0 +1,21 @@
+Once a world is generated, you will want to configure these. You must restart the server after running commands.
+
+Server is whitelisted by default. Related commands:
+/serverconfig whitelistmode off
+/whitelist add username
+
+Gameplay settings:
+/worldConfig propickNodeSearchRadius 6
+/worldconfig deathPunishment keep
+
+Making a player an operator:
+/op username
+
+Allowing a person to reset their class:
+/allowcharselonce username
+
+Then they have to type:
+.charsel
+
+Full listing here:
+https://wiki.vintagestory.at/index.php/World_Configuration

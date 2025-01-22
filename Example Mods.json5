@@ -1,0 +1,20 @@
+/*
+Copy this file and name it Mods.json5
+
+Edit that file to include the mods you want to install. Like this below:
+*/
+{
+	XLib: {
+		url: "https://mods.vintagestory.at/show/mod/244",
+	},
+	XSkills: {
+		url: "https://mods.vintagestory.at/show/mod/247",
+	},
+	PetAIHorses: {
+		url: "https://mods.vintagestory.at/feverstonehorses",
+		requires: [
+			// Mods with dependencies should be listed like so
+			"https://mods.vintagestory.at/petai",
+		],
+	},
+}
