@@ -5,8 +5,8 @@ cd $SERVERDIR
 
 _term() { 
   echo "Caught kill signal! Gracefully shutting down."
-  kill -TERM "$child_server" 2>/dev/null
-  kill -TERM "$child_monitor" 2>/dev/null
+
+  echo "/stop" > input.fifo
   
   # Wait for server to finish saving (up to 25 seconds)
   for i in {1..25}; do
@@ -15,6 +15,8 @@ _term() {
     fi
     sleep 1
   done
+
+  kill -TERM "$child_monitor" 2>/dev/null
 
   echo "Server shutdown complete."
 }
@@ -32,9 +34,20 @@ child_monitor=$!
 popd
 
 
+# Server start command
 export DOTNET_ROOT=/root/.dotnet
 export PATH=$PATH:$DOTNET_ROOT:$DOTNET_ROOT/tools
-dotnet VintagestoryServer.dll --dataPath /data 2>&1 | tee $LOG_FILE_CURRENT &
+COMMAND=(
+  dotnet
+  VintagestoryServer.dll
+  --dataPath
+  /data
+)
+
+
+# Pipes and logs
+mkfifo input.fifo
+tail -f input.fifo | "${COMMAND[@]}" 2>&1 | tee $LOG_FILE_CURRENT &
 child_server=$!
 
 
