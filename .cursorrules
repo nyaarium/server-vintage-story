@@ -2,21 +2,22 @@
 
 ## Quick Commands
 
--   `start.sh` - Start the server in daemon mode
--   `stop.sh` - Stop the server gracefully
--   `run.sh` - Run server in interactive mode
--   `update.sh` - Update server mods
+- `start.sh` - Start the server in daemon mode
+- `stop.sh` - Stop the server gracefully
+- `run.sh` - Run server in interactive mode
+- `update.sh` - Update server mods
 
 ## Project Structure
 
--   `data/` - Server data and world files
--   `docker/` - Docker container configuration
-    -   `monitor/` - Node.js server monitoring app
-    -   `mod-updater.js` - Node.js mod update utility
-    -   `start-docker-server.sh` - Main container entrypoint
+- `data/` - Server data and world files
+- `docker/` - Docker container configuration
+  - `monitor/` - Node.js server monitoring app
+  - `mod-updater.js` - Node.js mod update utility
+  - `start-docker-server.sh` - Main container entrypoint
 
 ## Development Notes
 
--   Server runs in Docker with volume mounts for persistence
--   Uses Dockerized Node.js for server monitoring and mod management
--   Configuration files are in JSON5 format
+- Server runs in Docker with volume mounts for persistence
+- Uses Dockerized Node.js for server monitoring and mod management
+- Configuration files are in JSON5 format
+- Be sure to update this file if you make drastic changes, like renaming or adding new files.
