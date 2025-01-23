@@ -1,19 +1,22 @@
-## Commands:
+# Nyaarium Vintage Story Server
 
-Start server: `start.sh`
+## Quick Commands
 
-Run to bash: `run.sh`
+-   `start.sh` - Start the server in daemon mode
+-   `stop.sh` - Stop the server gracefully
+-   `run.sh` - Run server in interactive mode
+-   `update.sh` - Update server mods
 
-Update mods: `update.sh`
+## Project Structure
 
-## Files:
+-   `data/` - Server data and world files
+-   `docker/` - Docker container configuration
+    -   `monitor/` - Node.js server monitoring app
+    -   `mod-updater.js` - Node.js mod update utility
+    -   `start-docker-server.sh` - Main container entrypoint
 
-`data/` contains the server data.
+## Development Notes
 
-`docker/` contains the server Docker.
-
-`docker/monitor/` is a small Node.js app that runs within the docker container and monitors the server.
-
-`docker/mod-updater.js` is a small Node.js app that runs within the docker container and updates the mods.
-
-`docker/start-docker-server.sh` is the main script that runs within the docker container and starts the server + monitor.
+-   Server runs in Docker with volume mounts for persistence
+-   Uses Dockerized Node.js for server monitoring and mod management
+-   Configuration files are in JSON5 format
