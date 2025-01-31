@@ -8,6 +8,7 @@ mkdir -p data
 docker build -t vintage-story docker/
 
 ./stop.sh
+sleep 1  # Give Docker time to clean up
 
 docker run --rm -i \
     --name vintage-story \
