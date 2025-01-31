@@ -8,4 +8,5 @@ git pull
 
 export APP_SERVICE=true
 ./run.sh
-docker logs -f vintage-story
+
+docker wait vintage-story
