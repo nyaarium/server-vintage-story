@@ -7,7 +7,7 @@ mkdir -p data
 
 docker build -t vintage-story docker/
 
-docker rm -f vintage-story 2>/dev/null || true
+./stop.sh
 
 docker run --rm -i \
     --name vintage-story \
