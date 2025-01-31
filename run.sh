@@ -5,9 +5,9 @@ cd "$(dirname "$0")"
 
 mkdir -p data
 
-docker build -t vintage-story docker/
+./stop.sh
 
-docker rm -f vintage-story 2>/dev/null || true
+docker build -t vintage-story docker/
 
 if [ "${APP_SERVICE:-}" = "true" ]; then
     DETACHED="-d"
