@@ -87,9 +87,9 @@ function reportNonVersionMatch(modsConfig) {
 	let log = "";
 	for (const id in nonMatches) {
 		const modConfig = nonMatches[id];
-		log += `  - ${modConfig.title} (${id})\n`;
-		log += `      Version: ${modConfig.version}\n`;
-		log += `      Supported Versions: ${modConfig.gameVersion}\n`;
+		log += `- ${modConfig.title} (${id})\n`;
+		log += `    Version: ${modConfig.version}\n`;
+		log += `    Supported Versions: ${modConfig.gameVersion}\n`;
 	}
 
 	if (log) {
@@ -138,9 +138,9 @@ async function performUpdates(modsConfig, resolvedVersionInfo) {
 			const zipFile = await response.arrayBuffer();
 
 			if (modInfo.currentVersion) {
-				logUpdated += `  - ${modInfo.title} (${modInfo.id})  ${modInfo.currentVersion}  ->  ${modInfo.targetVersion.version}\n`;
+				logUpdated += `- ${modInfo.title} (${modInfo.id})  ${modInfo.currentVersion}  ->  ${modInfo.targetVersion.version}\n`;
 			} else {
-				logInstalled += `  - ${modInfo.title} (${modInfo.id})  ${modInfo.targetVersion.version}\n`;
+				logInstalled += `- ${modInfo.title} (${modInfo.id})  ${modInfo.targetVersion.version}\n`;
 			}
 
 			await fs.promises.writeFile(downloadPath, Buffer.from(zipFile));
@@ -159,7 +159,7 @@ async function performUpdates(modsConfig, resolvedVersionInfo) {
 				auto: modInfo.auto,
 			};
 		} else if (modInfo.action === "up-to-date") {
-			logUpToDate += `  - ${modInfo.title} (${modInfo.id})\n`;
+			logUpToDate += `- ${modInfo.title} (${modInfo.id})\n`;
 
 			newModsConfig[modInfo.id] = {
 				title: modInfo.title,
@@ -193,7 +193,7 @@ async function performUpdates(modsConfig, resolvedVersionInfo) {
 	}
 	for (const modId in unlistedMods) {
 		fs.unlinkSync(`${MODS_DIR}/${modId}.zip`);
-		logDeleted += `  - ${modId}\n`;
+		logDeleted += `- ${modId}\n`;
 	}
 
 	// Write the updated config
