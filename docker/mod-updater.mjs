@@ -65,6 +65,8 @@ async function main() {
 		resolvedVersionInfo[modId] = resolveBestVersions(resolvedDependencies[modId], modInfo);
 	}
 
+	console.log(`\n\n`);
+
 	await performUpdates(modsConfig, resolvedVersionInfo);
 	modsConfig = readModsConfig();
 
