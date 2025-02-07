@@ -204,16 +204,16 @@ async function performUpdates(modsConfig, resolvedVersionInfo) {
 	let log = "";
 
 	if (logUpToDate) {
-		log += `\n✅ Up to date:\n${logUpToDate}`;
+		log += `\n\n✅ Up to date:\n\n${logUpToDate}`;
 	}
 	if (logInstalled) {
-		log += `\n✅ Newly installed:\n${logInstalled}`;
+		log += `\n\n✅ Newly installed:\n\n${logInstalled}`;
 	}
 	if (logUpdated) {
-		log += `\n✅ Updated:\n${logUpdated}`;
+		log += `\n\n✅ Updated:\n\n${logUpdated}`;
 	}
 	if (logDeleted) {
-		log += `\n❌ Deleted:\n${logDeleted}`;
+		log += `\n\n❌ Deleted:\n\n${logDeleted}`;
 	}
 
 	console.log(log);
