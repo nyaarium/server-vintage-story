@@ -38,8 +38,6 @@ async function main() {
 			}
 		}
 
-		console.log("\n");
-
 		const modInfo = await fetchModInfo(modConfig);
 		modInfos[modConfig.id] = modInfo;
 
@@ -59,8 +57,6 @@ async function main() {
 				continue;
 			}
 		}
-
-		console.log("\n");
 
 		resolvedVersionInfo[modId] = resolveBestVersions(resolvedDependencies[modId], modInfo);
 	}
@@ -139,6 +135,11 @@ async function performUpdates(modsConfig, resolvedVersionInfo) {
 
 			if (modInfo.currentVersion) {
 				logUpdated += `- ${modInfo.title} (${modInfo.id})  ${modInfo.currentVersion}  ->  ${modInfo.targetVersion.version}\n`;
+
+				let changelog = modInfo.changeLog;
+				changelog = "  > " + changelog.replace(/\n/gs, "\n  > ");
+
+				logUpdated += `${changelog}\n\n`;
 			} else {
 				logInstalled += `- ${modInfo.title} (${modInfo.id})  ${modInfo.targetVersion.version}\n`;
 			}
@@ -464,6 +465,7 @@ function compileChangeLog(versions, oldModVersion, newModVersion) {
 			.reverse()
 			.join("\n")
 			// Remove version headers
-			.replace(/\nVersion \d+\.\d+\.\d+:\n/gs, "\n")
+			.replace(/\n*Version \d+\.\d+\.\d+:\n/gs, "\n")
+			.trim()
 	);
 }
