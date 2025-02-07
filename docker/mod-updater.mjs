@@ -450,12 +450,12 @@ function compileChangeLog(versions, oldModVersion, newModVersion) {
 			startCollecting = true;
 		}
 
-		if (startCollecting) {
-			changelogEntries.push(`Version ${version.version}:\n${version.changelog}\n`);
-		}
-
 		if (version.version === oldModVersion) {
 			break;
+		}
+
+		if (startCollecting) {
+			changelogEntries.push(`Version ${version.version}:\n${version.changelog}\n`);
 		}
 	}
 
