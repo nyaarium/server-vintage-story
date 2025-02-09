@@ -20,7 +20,7 @@ _term() {
 
   echo "Server shutdown complete."
 }
-trap _term SIGINT SIGTERM
+trap _term TERM INT
 
 LOG_FILE_CURRENT="output.log"
 LOG_FILE_NEXT="output-last.log"
