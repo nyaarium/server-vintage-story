@@ -4,21 +4,21 @@ SERVERDIR=/app
 cd $SERVERDIR
 
 _term() { 
-  echo "Caught kill signal! Gracefully shutting down."
+	echo "Caught kill signal! Gracefully shutting down."
 
-  echo "/stop" > input.fifo
-  
-  # Wait for server to finish saving (up to 25 seconds)
-  for i in {1..25}; do
-    if ! kill -0 "$child_server" 2>/dev/null; then
-      break
-    fi
-    sleep 1
-  done
+	echo "/stop" > input.fifo
+	
+	# Wait for server to finish saving (up to 25 seconds)
+	for i in {1..25}; do
+		if ! kill -0 "$child_server" 2>/dev/null; then
+			break
+		fi
+		sleep 1
+	done
 
-  kill -TERM "$child_monitor" 2>/dev/null
+	kill -TERM "$child_monitor" 2>/dev/null
 
-  echo "Server shutdown complete."
+	echo "Server shutdown complete."
 }
 trap _term TERM INT
 
@@ -38,10 +38,10 @@ popd
 export DOTNET_ROOT=/root/.dotnet
 export PATH=$PATH:$DOTNET_ROOT:$DOTNET_ROOT/tools
 COMMAND=(
-  dotnet
-  VintagestoryServer.dll
-  --dataPath
-  /data
+	dotnet
+	VintagestoryServer.dll
+	--dataPath
+	/data
 )
 
 
