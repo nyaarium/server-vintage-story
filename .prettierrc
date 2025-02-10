@@ -12,7 +12,7 @@
 	"quoteProps": "consistent",
 	"overrides": [
 		{
-			"files": [".prettierrc"],
+			"files": [".prettierrc", "*.sh"],
 			"options": {
 				"tabWidth": 4,
 				"useTabs": true
