@@ -10,6 +10,8 @@ const MODS_JSON_PATH = "/configs/Mods.json5";
 
 const MOST_RECENT_ENTRIES_COUNT = 10;
 
+const CACHE_TIME_HOURS = 4;
+
 // Start the main function
 main().catch((error) => {
 	console.error("Mod updater failed:", error);
@@ -32,7 +34,7 @@ async function main() {
 		if (modConfig.lastUpdated) {
 			const lastUpdated = moment(modConfig.lastUpdated);
 			const diff = now.diff(lastUpdated, "hours");
-			if (diff < 23) {
+			if (diff < CACHE_TIME_HOURS - 1) {
 				modInfos[modConfig.id] = modConfig;
 				continue;
 			}
@@ -52,7 +54,7 @@ async function main() {
 		if (modInfo.lastUpdated) {
 			const lastUpdated = moment(modInfo.lastUpdated);
 			const diff = now.diff(lastUpdated, "hours");
-			if (diff < 23) {
+			if (diff < CACHE_TIME_HOURS - 1) {
 				resolvedVersionInfo[modId] = modInfo;
 				continue;
 			}
@@ -113,7 +115,7 @@ async function performUpdates(modsConfig, resolvedVersionInfo) {
 		if (modInfo.lastUpdated) {
 			const lastUpdated = moment(modInfo.lastUpdated);
 			const diff = now.diff(lastUpdated, "hours");
-			if (diff < 24) {
+			if (diff < CACHE_TIME_HOURS) {
 				// Copy over and continue
 				newModsConfig[modInfo.id] = modsConfig[modInfo.id];
 				continue;
