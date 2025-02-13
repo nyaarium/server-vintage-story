@@ -1,4 +1,5 @@
 import * as cheerio from "cheerio";
+import { Client, GatewayIntentBits } from "discord.js";
 import fs from "fs";
 import JSON5 from "json5";
 import moment from "moment-timezone";
@@ -6,7 +7,8 @@ import fetch from "node-fetch";
 
 const GAME_VERSION = process.env.GAME_VERSION;
 const MODS_DIR = "/data/Mods";
-const MODS_JSON_PATH = "/configs/Mods.json5";
+const MODS_JSON_PATH = "/configs/mods.json5";
+const DISCORD_CONFIG_PATH = "/configs/discord-config.json5";
 
 const MOST_RECENT_ENTRIES_COUNT = 10;
 
@@ -205,9 +207,6 @@ async function performUpdates(modsConfig, resolvedVersionInfo) {
 
 	let log = "";
 
-	if (logUpToDate) {
-		log += `\n\n✅ Up to date:\n\n${logUpToDate}`;
-	}
 	if (logInstalled) {
 		log += `\n\n✅ Newly installed:\n\n${logInstalled}`;
 	}
@@ -218,7 +217,85 @@ async function performUpdates(modsConfig, resolvedVersionInfo) {
 		log += `\n\n❌ Deleted:\n\n${logDeleted}`;
 	}
 
-	console.log(log);
+	console.log(logUpToDate ? `\n\n✅ Up to date:\n\n${logUpToDate}` : "" + log);
+
+	// Send Discord notification if there are updates
+	if (logInstalled || logUpdated || logDeleted) {
+		console.log("\nAttempting Discord notification...");
+
+		let discordConfig = null;
+		try {
+			if (fs.existsSync(DISCORD_CONFIG_PATH)) {
+				discordConfig = JSON5.parse(fs.readFileSync(DISCORD_CONFIG_PATH, "utf8"));
+				console.log("Discord config loaded:", {
+					hasSecretKey: !!discordConfig.secretKey,
+					channels: discordConfig.broadcastChannels?.length || 0,
+				});
+			}
+		} catch (error) {
+			console.error("Failed to load Discord config:", error);
+		}
+
+		if (discordConfig?.secretKey && discordConfig?.broadcastChannels?.length) {
+			console.log("Creating Discord client...");
+			const discordClient = new Client({
+				intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent],
+			});
+
+			try {
+				console.log("Attempting Discord login...");
+				await discordClient.login(discordConfig.secretKey);
+
+				// Send to all configured channels
+				for (const channel of discordConfig.broadcastChannels) {
+					try {
+						console.log("Fetching guild...", channel.guildId);
+						const guild = await discordClient.guilds.fetch(channel.guildId);
+						console.log("Guild found:", guild.name);
+						const textChannel = await guild.channels.fetch(channel.channelId);
+						console.log("Channel found:", {
+							name: textChannel?.name,
+							type: textChannel?.type,
+							isText: textChannel?.isTextBased(),
+						});
+
+						if (textChannel?.isTextBased()) {
+							console.log("Channel is text based, sending message...");
+							let message = "**Vintage Story Server Mod Updates**" + log;
+
+							// Split message if it's too long (Discord has 2000 char limit)
+							if (message.length > 1900) {
+								message = message.substring(0, 1900) + "\n... (message truncated)";
+							}
+
+							await textChannel.send(message);
+							console.log("Message sent successfully!");
+						} else {
+							console.log("Channel is not text based! Channel type:", textChannel?.type);
+						}
+					} catch (error) {
+						console.error("Failed to send to channel. Error details:", error);
+						if (error.code) console.error("Error code:", error.code);
+						if (error.message) console.error("Error message:", error.message);
+						if (error.httpStatus) console.error("HTTP status:", error.httpStatus);
+					}
+				}
+			} catch (error) {
+				console.error("Failed to send Discord notification. Error details:", error);
+				if (error.code) console.error("Error code:", error.code);
+				if (error.message) console.error("Error message:", error.message);
+				if (error.httpStatus) console.error("HTTP status:", error.httpStatus);
+			} finally {
+				console.log("Cleaning up Discord client...");
+				await discordClient.destroy();
+				console.log("Discord client destroyed.");
+			}
+		} else {
+			console.log("No Discord config found or missing required fields.");
+		}
+	} else {
+		console.log("No updates to report to Discord.");
+	}
 
 	console.log("Done!");
 }

@@ -39,7 +39,7 @@ RUN chmod +x /root/install.sh \
 	&& /root/install.sh \
 	&& rm /root/install.sh
 
-RUN cd /root && npm i json5 node-fetch cheerio moment moment-timezone
+RUN cd /root && npm i json5 node-fetch cheerio moment moment-timezone discord.js
 
 COPY start-docker-server.sh /app/start-docker-server.sh
 RUN chmod +x /app/start-docker-server.sh
