@@ -78,8 +78,11 @@ function reportNonVersionMatch(modsConfig) {
 
 	for (const id in modsConfig) {
 		const modConfig = modsConfig[id];
-		const gameVersions = modConfig.gameVersion.split(", ");
-		if (!gameVersions.some((version) => versionMinorMatches(GAME_VERSION, version))) {
+		const gameVersions = modConfig.gameVersion?.split(", ") || [];
+
+		const hasMatch = gameVersions.some(isVersionSupported);
+
+		if (!hasMatch) {
 			nonMatches[id] = modConfig;
 		}
 	}
@@ -140,8 +143,10 @@ async function performUpdates(modsConfig, resolvedVersionInfo) {
 			if (modInfo.currentVersion) {
 				logUpdated += `- ${modInfo.title} (${modInfo.id})  ${modInfo.currentVersion}  ->  ${modInfo.targetVersion.version}\n`;
 
-				let changelog = modInfo.changeLog;
-				changelog = "  > " + changelog.replace(/\n/gs, "\n  > ");
+				let changelog = modInfo.changeLog.trim();
+				if (changelog) {
+					changelog = "  > " + changelog.replace(/\n/gs, "\n  > ");
+				}
 
 				logUpdated += `${changelog}\n\n`;
 			} else {
@@ -461,108 +466,102 @@ async function fetchModInfo(modConfig) {
 	}
 }
 
-function versionMinorMatches(gameVersion, version) {
-	// Strip any -rc, -pre, etc suffixes for base version comparison
-	const baseGameVersion = gameVersion.split("-")[0];
-	const baseVersion = version.split("-")[0];
+/* TODO: Some thoughts on how to improve the version selector.
 
-	const versionParts = baseVersion.split(".");
-	const gameVersionParts = baseGameVersion.split(".");
+Leave this dev note here for now until we confirm a working solution. Update this comment if you are revising the algorithms.
 
-	// If version has x, treat as wildcard (e.g. 1.20.x matches any 1.20)
-	if (version.endsWith(".x")) {
-		return versionParts[0] === gameVersionParts[0] && versionParts[1] === gameVersionParts[1];
+- Need a version splitter function.
+  - Splits a version string into 4: major, minor, patch, and extra parts
+
+- Need a version sort-comparator function. Old versionMinorMatches didnt really make the code clear. This comparator will be much better to understand.
+  - Compares two versions (-1, 0, 1):
+  - Major have highest rank
+  - Minor next rank
+  - Patch last rank (All "-" tags, like "-rc.4", are considered the same rank)
+
+- bestModInfo should always be the newest version, but not exceeding the GAME_VERSION
+  - If (!bestModInfo), pick the first one seen (implies the newest version available)
+*/
+
+function splitVersion(version) {
+	// Split base version from extra tag
+	const [base, ...extraParts] = version.split("-");
+	const extra = extraParts.join("-"); // Rejoin in case there are multiple hyphens
+
+	// Split base into major.minor.patch
+	const [major = "0", minor = "0", patch = "0"] = base.split(".");
+
+	return {
+		major: parseInt(major, 10),
+		minor: parseInt(minor, 10),
+		patch: parseInt(patch, 10),
+		extra: extra || null,
+	};
+}
+
+function compareVersions(versionA, versionB) {
+	const a = splitVersion(versionA);
+	const b = splitVersion(versionB);
+
+	// Compare major.minor.patch
+	if (a.major !== b.major) return a.major - b.major;
+	if (a.minor !== b.minor) return a.minor - b.minor;
+	if (a.patch !== b.patch) return a.patch - b.patch;
+
+	// If one is a pre-release and the other isn't, stable comes first
+	if (a.extra !== b.extra) {
+		return a.extra ? -1 : 1;
 	}
 
-	// Major and minor must match (1.20)
-	if (versionParts[0] !== gameVersionParts[0] || versionParts[1] !== gameVersionParts[1]) {
-		return false;
-	}
+	// Versions are equal
+	return 0;
+}
 
-	// If patch versions exist, mod version must be <= game version
-	if (versionParts[2] && gameVersionParts[2]) {
-		const modPatch = parseInt(versionParts[2], 10);
-		const gamePatch = parseInt(gameVersionParts[2], 10);
-		return modPatch <= gamePatch;
-	}
-
-	return true;
+function isVersionSupported(version) {
+	const currentParts = splitVersion(GAME_VERSION);
+	const versionParts = splitVersion(version);
+	return (
+		currentParts.major === versionParts.major &&
+		currentParts.minor === versionParts.minor &&
+		currentParts.patch === versionParts.patch
+	);
 }
 
 function resolveBestVersions(modConfig, modInfo) {
 	console.log(modInfo.title);
+	console.log(`Current: ${modConfig.currentVersion || "Not installed"}`);
 
-	// Split versions into stable and test versions
-	const stableVersions = [];
-	const testVersions = [];
+	// Filter versions that support our game version
+	const compatibleVersions = modInfo.versions.filter((version) => {
+		// At least one of the gameVersions must match our major.minor
+		return version.gameVersions.some(isVersionSupported);
+	});
 
-	// Filter and categorize versions
-	for (const version of modInfo.versions) {
-		const isTestVersion = version.version.includes("-") || version.gameVersions.some((v) => v.includes("-"));
-		const isCompatible = version.gameVersions.some((v) => versionMinorMatches(GAME_VERSION, v));
+	// Sort by version (highest first)
+	compatibleVersions.sort((a, b) => -compareVersions(a.version, b.version));
 
-		if (!isCompatible) continue;
-
-		if (isTestVersion) {
-			testVersions.push(version);
-		} else {
-			stableVersions.push(version);
-		}
-	}
-
-	// Sort both arrays by version number (highest first)
-	const sortByVersion = (a, b) => {
-		const aBase = a.version.split("-")[0].split(".");
-		const bBase = b.version.split("-")[0].split(".");
-
-		// Compare each version part
-		for (let i = 0; i < Math.max(aBase.length, bBase.length); i++) {
-			const aPart = parseInt(aBase[i] || "0", 10);
-			const bPart = parseInt(bBase[i] || "0", 10);
-			if (aPart !== bPart) return bPart - aPart;
-		}
-		return 0;
-	};
-
-	stableVersions.sort(sortByVersion);
-	testVersions.sort(sortByVersion);
-
-	// Choose best version - prefer stable over test
-	const bestVersion = stableVersions[0] || testVersions[0];
+	// Choose best version
+	const bestVersion = compatibleVersions[0];
 	let action = "up-to-date";
 	let targetVersion = null;
 	let changeLog = null;
 
-	console.log(`Current: ${modConfig.currentVersion || "Not installed"}`);
-
 	if (bestVersion) {
-		const versionType = stableVersions.includes(bestVersion) ? "stable" : "test";
-		console.log(`Online: ${bestVersion.version} - (${bestVersion.releaseDate}) [${versionType}]`);
+		console.log(`Online: ${bestVersion.version} - (${bestVersion.releaseDate})`);
 		targetVersion = bestVersion;
+
+		if (modConfig.currentVersion !== bestVersion.version) {
+			action = "update";
+			changeLog = compileChangeLog(modInfo.versions, modConfig.currentVersion, bestVersion.version);
+		}
 	} else if (modInfo.versions.length) {
 		// No compatible version found, log all available versions
 		console.log("No compatible version found. Available versions:");
 		for (const v of modInfo.versions.slice(0, 3)) {
 			console.log(`  ${v.version} - Supports: ${v.gameVersions.join(", ")}`);
 		}
-		const nextBestVersion = modInfo.versions[0];
-		console.log(`Using latest: ${nextBestVersion.version} - (${nextBestVersion.releaseDate})`);
-		targetVersion = nextBestVersion;
-	} else if (!modConfig.downloadFile) {
-		console.log("Online: No download link found!");
 	} else {
-		console.log("Online: No versions found!");
-	}
-
-	if (targetVersion) {
-		if (modConfig.currentVersion === targetVersion.version) {
-			action = "up-to-date";
-		} else {
-			action = "update";
-			changeLog = compileChangeLog(modInfo.versions, modConfig.currentVersion, targetVersion.version);
-		}
-	} else {
-		action = "up-to-date";
+		console.log("No versions found!");
 	}
 
 	return {
