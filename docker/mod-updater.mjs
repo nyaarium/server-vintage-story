@@ -10,7 +10,7 @@ const MODS_DIR = "/data/Mods";
 const MODS_JSON_PATH = "/configs/mods.json5";
 const DISCORD_CONFIG_PATH = "/configs/discord-config.json5";
 
-const MOST_RECENT_ENTRIES_COUNT = 10;
+const MOST_RECENT_ENTRIES_COUNT = 20;
 
 const CACHE_TIME_HOURS = 4;
 
