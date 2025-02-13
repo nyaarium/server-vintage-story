@@ -461,13 +461,74 @@ async function fetchModInfo(modConfig) {
 	}
 }
 
+function versionMinorMatches(gameVersion, version) {
+	// Strip any -rc, -pre, etc suffixes for base version comparison
+	const baseGameVersion = gameVersion.split("-")[0];
+	const baseVersion = version.split("-")[0];
+
+	const versionParts = baseVersion.split(".");
+	const gameVersionParts = baseGameVersion.split(".");
+
+	// If version has x, treat as wildcard (e.g. 1.20.x matches any 1.20)
+	if (version.endsWith(".x")) {
+		return versionParts[0] === gameVersionParts[0] && versionParts[1] === gameVersionParts[1];
+	}
+
+	// Major and minor must match (1.20)
+	if (versionParts[0] !== gameVersionParts[0] || versionParts[1] !== gameVersionParts[1]) {
+		return false;
+	}
+
+	// If patch versions exist, mod version must be <= game version
+	if (versionParts[2] && gameVersionParts[2]) {
+		const modPatch = parseInt(versionParts[2], 10);
+		const gamePatch = parseInt(gameVersionParts[2], 10);
+		return modPatch <= gamePatch;
+	}
+
+	return true;
+}
+
 function resolveBestVersions(modConfig, modInfo) {
 	console.log(modInfo.title);
 
-	const bestVersion = modInfo.versions.filter((version) =>
-		version.gameVersions.some((supportedVersion) => versionMinorMatches(GAME_VERSION, supportedVersion)),
-	)[0];
+	// Split versions into stable and test versions
+	const stableVersions = [];
+	const testVersions = [];
 
+	// Filter and categorize versions
+	for (const version of modInfo.versions) {
+		const isTestVersion = version.version.includes("-") || version.gameVersions.some((v) => v.includes("-"));
+		const isCompatible = version.gameVersions.some((v) => versionMinorMatches(GAME_VERSION, v));
+
+		if (!isCompatible) continue;
+
+		if (isTestVersion) {
+			testVersions.push(version);
+		} else {
+			stableVersions.push(version);
+		}
+	}
+
+	// Sort both arrays by version number (highest first)
+	const sortByVersion = (a, b) => {
+		const aBase = a.version.split("-")[0].split(".");
+		const bBase = b.version.split("-")[0].split(".");
+
+		// Compare each version part
+		for (let i = 0; i < Math.max(aBase.length, bBase.length); i++) {
+			const aPart = parseInt(aBase[i] || "0", 10);
+			const bPart = parseInt(bBase[i] || "0", 10);
+			if (aPart !== bPart) return bPart - aPart;
+		}
+		return 0;
+	};
+
+	stableVersions.sort(sortByVersion);
+	testVersions.sort(sortByVersion);
+
+	// Choose best version - prefer stable over test
+	const bestVersion = stableVersions[0] || testVersions[0];
 	let action = "up-to-date";
 	let targetVersion = null;
 	let changeLog = null;
@@ -475,11 +536,17 @@ function resolveBestVersions(modConfig, modInfo) {
 	console.log(`Current: ${modConfig.currentVersion || "Not installed"}`);
 
 	if (bestVersion) {
-		console.log(`Online: ${bestVersion.version} - (${bestVersion.releaseDate})`);
+		const versionType = stableVersions.includes(bestVersion) ? "stable" : "test";
+		console.log(`Online: ${bestVersion.version} - (${bestVersion.releaseDate}) [${versionType}]`);
 		targetVersion = bestVersion;
 	} else if (modInfo.versions.length) {
+		// No compatible version found, log all available versions
+		console.log("No compatible version found. Available versions:");
+		for (const v of modInfo.versions.slice(0, 3)) {
+			console.log(`  ${v.version} - Supports: ${v.gameVersions.join(", ")}`);
+		}
 		const nextBestVersion = modInfo.versions[0];
-		console.log(`Online: ${nextBestVersion.version} - (${nextBestVersion.releaseDate})`);
+		console.log(`Using latest: ${nextBestVersion.version} - (${nextBestVersion.releaseDate})`);
 		targetVersion = nextBestVersion;
 	} else if (!modConfig.downloadFile) {
 		console.log("Online: No download link found!");
@@ -511,13 +578,6 @@ function resolveBestVersions(modConfig, modInfo) {
 		...(modConfig.auto ? { auto: true } : {}),
 		lastUpdated: modConfig.lastUpdated,
 	};
-}
-
-function versionMinorMatches(gameVersion, version) {
-	const versionParts = version.split(".");
-	const gameVersionParts = gameVersion.split(".");
-
-	return versionParts[0] === gameVersionParts[0] && versionParts[1] === gameVersionParts[1];
 }
 
 function compileChangeLog(versions, oldModVersion, newModVersion) {
