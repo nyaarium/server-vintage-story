@@ -19,7 +19,8 @@ fi
 
 docker run --rm -it $DETACHED \
     --name $APP_NAME \
-    --log-opt max-file=0 \
+    --log-opt max-size=1b \
+    --log-opt max-file=1 \
     -v "$(pwd)/data:/data" \
     -v "$(pwd)/Mods.json5:/configs/Mods.json5" \
     -p 8080:8080/tcp \
