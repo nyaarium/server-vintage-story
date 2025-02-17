@@ -1,5 +1,7 @@
 #!/bin/bash
 
+export APP_NAME="vintage-story"
+
 set -e
 cd "$(dirname "$0")"
 
@@ -7,7 +9,7 @@ mkdir -p data
 
 ./stop.sh
 
-docker build -t vintage-story docker/
+docker build -t $APP_NAME docker/
 
 if [ "${APP_SERVICE:-}" = "true" ]; then
     DETACHED="-d"
@@ -16,10 +18,10 @@ else
 fi
 
 docker run --rm -it $DETACHED \
-    --name vintage-story \
+    --name $APP_NAME \
     -v "$(pwd)/data:/data" \
     -v "$(pwd)/Mods.json5:/configs/Mods.json5" \
     -p 8080:8080/tcp \
     -p 42420:42420/tcp \
-    vintage-story \
+    $APP_NAME \
     $@

@@ -1,5 +1,7 @@
 #!/bin/bash
 
+export APP_NAME="vintage-story"
+
 set -e
 cd "$(dirname "$0")"
 
@@ -13,4 +15,4 @@ fi
 export APP_SERVICE=true
 ./run.sh
 
-docker wait vintage-story
+docker wait $APP_NAME

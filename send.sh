@@ -1,5 +1,7 @@
 #!/bin/bash
 
+export APP_NAME="vintage-story"
+
 set -e
 cd "$(dirname "$0")"
 
@@ -9,4 +11,4 @@ if [ $# -eq 0 ]; then
 fi
 
 command="$*"
-docker exec vintage-story bash -c "echo \"$command\" > /app/input.fifo" 
+docker exec $APP_NAME bash -c "echo \"$command\" > /app/input.fifo" 
