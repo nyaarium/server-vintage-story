@@ -66,8 +66,6 @@ try {
 }
 
 async function pollServer() {
-	console.log(fs.readFileSync(LOG_FILE).toString(`utf8`));
-
 	const res = await run(path.join(process.cwd(), `poll-log.sh`));
 	const json = JSON5.parse(res.stdout);
 
