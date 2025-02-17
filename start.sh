@@ -15,4 +15,4 @@ fi
 export APP_SERVICE=true
 ./run.sh
 
-docker wait $APP_NAME
+docker attach --no-stdin $APP_NAME
