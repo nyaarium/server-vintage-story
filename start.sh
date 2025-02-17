@@ -15,4 +15,4 @@ fi
 export APP_SERVICE=true
 ./run.sh
 
-docker attach --no-stdin $APP_NAME
+docker logs -f --tail 0 $APP_NAME
