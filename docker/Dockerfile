@@ -34,12 +34,12 @@ RUN NODE_MAJOR=22 \
 	&& apt install -y nodejs \
 	&& apt clean && rm -rf /var/lib/apt/lists/*
 
+RUN cd /root && npm i json5 node-fetch cheerio moment moment-timezone discord.js
+
 COPY install.sh /root/install.sh
 RUN chmod +x /root/install.sh \
 	&& /root/install.sh \
 	&& rm /root/install.sh
-
-RUN cd /root && npm i json5 node-fetch cheerio moment moment-timezone discord.js
 
 COPY start-docker-server.sh /app/start-docker-server.sh
 RUN chmod +x /app/start-docker-server.sh
