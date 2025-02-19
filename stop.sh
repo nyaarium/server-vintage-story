@@ -20,9 +20,8 @@ for i in {1..20}; do
         success=true
         break
     fi
+    sleep 1
 done
-
-sleep 1
 
 if [ "$success" != "true" ]; then
     echo "App did not stop gracefully after 20 seconds"
