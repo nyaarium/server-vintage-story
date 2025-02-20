@@ -80,7 +80,7 @@ function reportNonVersionMatch(modsConfig) {
 		const modConfig = modsConfig[id];
 		const gameVersions = modConfig.gameVersion?.split(", ") || [];
 
-		const hasMatch = gameVersions.some(isVersionSupported);
+		const hasMatch = gameVersions.some(isVersionExactMatch);
 
 		if (!hasMatch) {
 			nonMatches[id] = modConfig;
@@ -511,16 +511,16 @@ function compareVersions(versionA, versionB) {
 	if (a.minor !== b.minor) return a.minor - b.minor;
 	if (a.patch !== b.patch) return a.patch - b.patch;
 
-	// If one is a pre-release and the other isn't, stable comes first
-	if (a.extra !== b.extra) {
-		return a.extra ? -1 : 1;
-	}
+	// Do not care about extra tags. Whichever is newer is better.
+	// if (a.extra !== b.extra) {
+	// 	return a.extra ? -1 : 1;
+	// }
 
 	// Versions are equal
 	return 0;
 }
 
-function isVersionSupported(version) {
+function isVersionExactMatch(version) {
 	const currentParts = splitVersion(GAME_VERSION);
 	const versionParts = splitVersion(version);
 	return (
@@ -530,15 +530,52 @@ function isVersionSupported(version) {
 	);
 }
 
+function isVersionMinorMatch(version) {
+	const currentParts = splitVersion(GAME_VERSION);
+	const versionParts = splitVersion(version);
+	return currentParts.major === versionParts.major && currentParts.minor === versionParts.minor;
+}
+
+function isVersionBelow(version) {
+	const currentParts = splitVersion(GAME_VERSION);
+	const versionParts = splitVersion(version);
+
+	if (versionParts.major !== currentParts.major) {
+		return versionParts.major < currentParts.major;
+	}
+	if (versionParts.minor !== currentParts.minor) {
+		return versionParts.minor < currentParts.minor;
+	}
+	return versionParts.patch < currentParts.patch;
+}
+
 function resolveBestVersions(modConfig, modInfo) {
 	console.log(modInfo.title);
 	console.log(`Current: ${modConfig.currentVersion || "Not installed"}`);
 
-	// Filter versions that support our game version
-	const compatibleVersions = modInfo.versions.filter((version) => {
-		// At least one of the gameVersions must match our major.minor
-		return version.gameVersions.some(isVersionSupported);
+	// Match exact version if possible
+	let compatibleVersions = modInfo.versions.filter((version) => {
+		return version.gameVersions.some(isVersionExactMatch);
 	});
+
+	// If not, match major.minor and any patch versions
+	if (!compatibleVersions.length) {
+		compatibleVersions = modInfo.versions.filter((version) => {
+			return version.gameVersions.some(isVersionMinorMatch);
+		});
+	}
+
+	// If not, match the first version below the current version
+	if (!compatibleVersions.length) {
+		compatibleVersions = modInfo.versions.filter((version) => {
+			return version.gameVersions.some(isVersionBelow);
+		});
+	}
+
+	// If not, use anything
+	if (!compatibleVersions.length) {
+		compatibleVersions = modInfo.versions;
+	}
 
 	// Sort by version (highest first)
 	compatibleVersions.sort((a, b) => -compareVersions(a.version, b.version));
@@ -546,25 +583,12 @@ function resolveBestVersions(modConfig, modInfo) {
 	// Choose best version
 	const bestVersion = compatibleVersions[0];
 	let action = "up-to-date";
-	let targetVersion = null;
+	let targetVersion = bestVersion;
 	let changeLog = null;
 
-	if (bestVersion) {
-		console.log(`Online: ${bestVersion.version} - (${bestVersion.releaseDate})`);
-		targetVersion = bestVersion;
-
-		if (modConfig.currentVersion !== bestVersion.version) {
-			action = "update";
-			changeLog = compileChangeLog(modInfo.versions, modConfig.currentVersion, bestVersion.version);
-		}
-	} else if (modInfo.versions.length) {
-		// No compatible version found, log all available versions
-		console.log("No compatible version found. Available versions:");
-		for (const v of modInfo.versions.slice(0, 3)) {
-			console.log(`  ${v.version} - Supports: ${v.gameVersions.join(", ")}`);
-		}
-	} else {
-		console.log("No versions found!");
+	if (modConfig.currentVersion !== bestVersion.version) {
+		action = "update";
+		changeLog = compileChangeLog(modInfo.versions, modConfig.currentVersion, bestVersion.version);
 	}
 
 	return {
