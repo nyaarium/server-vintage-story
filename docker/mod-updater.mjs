@@ -322,7 +322,7 @@ function readModsConfig() {
 
 		return modsConfig;
 	} catch (error) {
-		console.error("Failed to read or parse Mods.json5:", error);
+		console.error("Failed to read or parse mods.json5:", error);
 		throw error;
 	}
 }
