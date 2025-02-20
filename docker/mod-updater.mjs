@@ -412,21 +412,37 @@ async function fetchModInfo(modConfig) {
 					.filter((line) => line)
 					.join("\n");
 
-				/*
-				<td>
-					<div class="tags">
-						<a href="/list/mod/?gv[]=270" class="tag" style="background-color:#C9C9C9">#v1.20.4-rc.3</a>
-						<a href="/list/mod/?gv[]=271" class="tag" style="background-color:#C9C9C9">#v1.20.4-rc.4</a>
-					</div>
-				</td>
-				*/
 				const $gameVersionTags = $gameVersionCell.find(".tag");
-				// [ '1.19.3' ]
-				const gameVersions = $gameVersionTags.toArray().map((tag) => {
-					return $(tag)
-						.text()
-						.trim()
-						.replace(/^[#v]*/, "");
+				let gameVersions = [];
+				$gameVersionTags.each((i, tag) => {
+					const $tag = $(tag);
+					const title = $tag.attr("title");
+					if (title) {
+						/*
+						<td>
+							<div class="tags">
+								<a href="#" class="tag" style="background-color:#C9C9C9" title="v1.20.0, v1.20.1, v1.20.2, v1.20.3, v1.20.4">Various v1.20.x*</a>
+							</div>
+						</td>
+						*/
+						const versions = title.split(",").map((v) => v.trim().replace(/^[#v]*/, ""));
+						gameVersions.push(...versions);
+					} else {
+						/*
+						<td>
+							<div class="tags">
+								<a href="/list/mod/?gv[]=270" class="tag" style="background-color:#C9C9C9">#v1.20.4-rc.3</a>
+								<a href="/list/mod/?gv[]=271" class="tag" style="background-color:#C9C9C9">#v1.20.4-rc.4</a>
+							</div>
+						</td>
+						*/
+						gameVersions.push(
+							$tag
+								.text()
+								.trim()
+								.replace(/^[#v]*/, ""),
+						);
+					}
 				});
 
 				const releaseDate = $row.find("td").eq(3).text().trim();
