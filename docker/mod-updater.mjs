@@ -414,17 +414,13 @@ async function fetchModInfo(modConfig) {
 
 				// Get game versions - check for tooltip first, otherwise use text
 				// Clean up game versions and remove any extra text/tabs
-				const gameVersionTitle = $gameVersionCell.find(".tag").attr("title");
-				const gameVersions = gameVersionTitle
-					? gameVersionTitle.split(", ").map((v) => v.trim().replace(/^v/, ""))
-					: [
-							$gameVersionCell
-								.text()
-								.trim()
-								.replace(/^[#v]/, "")
-								.split(/[\t\s]/)[0]
-								.replace(/^v/, ""),
-					  ];
+				const gameVersionTitle = $gameVersionCell.find(".tag");
+				const gameVersions = gameVersionTitle.toArray().map((tag) => {
+					return $(tag)
+						.text()
+						.trim()
+						.replace(/^[#v]*/, "");
+				});
 
 				const releaseDate = $row.find("td").eq(3).text().trim();
 
