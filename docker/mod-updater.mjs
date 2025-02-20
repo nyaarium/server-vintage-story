@@ -412,10 +412,17 @@ async function fetchModInfo(modConfig) {
 					.filter((line) => line)
 					.join("\n");
 
-				// Get game versions - check for tooltip first, otherwise use text
-				// Clean up game versions and remove any extra text/tabs
-				const gameVersionTitle = $gameVersionCell.find(".tag");
-				const gameVersions = gameVersionTitle.toArray().map((tag) => {
+				/*
+				<td>
+					<div class="tags">
+						<a href="/list/mod/?gv[]=270" class="tag" style="background-color:#C9C9C9">#v1.20.4-rc.3</a>
+						<a href="/list/mod/?gv[]=271" class="tag" style="background-color:#C9C9C9">#v1.20.4-rc.4</a>
+					</div>
+				</td>
+				*/
+				const $gameVersionTags = $gameVersionCell.find(".tag");
+				// [ '1.19.3' ]
+				const gameVersions = $gameVersionTags.toArray().map((tag) => {
 					return $(tag)
 						.text()
 						.trim()
