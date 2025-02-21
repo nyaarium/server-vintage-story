@@ -162,6 +162,7 @@ async function performUpdates(modsConfig, resolvedVersionInfo) {
 			newModsConfig[modInfo.id] = {
 				title: modInfo.title,
 				url: modInfo.url,
+				lockToVersion: modInfo.lockToVersion,
 				version: modInfo.targetVersion.version,
 				gameVersion: modInfo.targetVersion.gameVersions.join(", "),
 				requires: modInfo.requires,
@@ -174,6 +175,7 @@ async function performUpdates(modsConfig, resolvedVersionInfo) {
 			newModsConfig[modInfo.id] = {
 				title: modInfo.title,
 				url: modInfo.url,
+				lockToVersion: modInfo.lockToVersion,
 				version: modInfo.currentVersion,
 				gameVersion: modInfo.gameVersion,
 				requires: modInfo.requires,
@@ -338,6 +340,7 @@ function resolveDependencies(modConfig) {
 		const id = url.split("/").pop();
 
 		if (modLookup[id]) {
+			modLookup[id].lockToVersion = modInfo.lockToVersion;
 			modLookup[id].currentVersion = modInfo.version;
 			modLookup[id].gameVersion = modInfo.gameVersion;
 			modLookup[id].lastUpdated = modInfo.lastUpdated;
@@ -345,6 +348,7 @@ function resolveDependencies(modConfig) {
 			modLookup[id] = {
 				id,
 				url,
+				lockToVersion: modInfo.lockToVersion,
 				currentVersion: modInfo.version,
 				gameVersion: modInfo.gameVersion,
 				requires: modInfo.requires,
@@ -362,6 +366,7 @@ function resolveDependencies(modConfig) {
 					modLookup[requireId] = {
 						id: requireId,
 						url: requireUrl,
+						lockToVersion: reqConfig?.lockToVersion,
 						currentVersion: reqConfig?.version,
 						gameVersion: reqConfig?.gameVersion,
 						requiredBy: [id],
@@ -569,6 +574,48 @@ function resolveBestVersions(modConfig, modInfo) {
 	console.log(modInfo.title);
 	console.log(`Current: ${modConfig.currentVersion || "Not installed"}`);
 
+	// If lockToVersion is specified, only look for that version
+	if (modConfig.lockToVersion) {
+		console.log(`Locked to version: ${modConfig.lockToVersion}`);
+		const lockedVersion = modInfo.versions.find((version) => version.version === modConfig.lockToVersion);
+
+		if (!lockedVersion) {
+			console.log(`Warning: Locked version ${modConfig.lockToVersion} not found in available versions`);
+			return {
+				id: modConfig.id,
+				title: modInfo.title,
+				url: modConfig.url,
+				lockToVersion: modConfig.lockToVersion,
+				currentVersion: modConfig.currentVersion,
+				gameVersion: modConfig.gameVersion,
+				targetVersion: null,
+				requires: modConfig.requires,
+				action: "up-to-date", // Can't update if locked version not found
+				changeLog: null,
+				...(modConfig.auto ? { auto: true } : {}),
+				lastUpdated: modConfig.lastUpdated,
+			};
+		}
+
+		return {
+			id: modConfig.id,
+			title: modInfo.title,
+			url: modConfig.url,
+			lockToVersion: modConfig.lockToVersion,
+			currentVersion: modConfig.currentVersion,
+			gameVersion: modConfig.gameVersion,
+			targetVersion: lockedVersion,
+			requires: modConfig.requires,
+			action: modConfig.currentVersion !== lockedVersion.version ? "update" : "up-to-date",
+			changeLog:
+				modConfig.currentVersion !== lockedVersion.version
+					? compileChangeLog(modInfo.versions, modConfig.currentVersion, lockedVersion.version)
+					: null,
+			...(modConfig.auto ? { auto: true } : {}),
+			lastUpdated: modConfig.lastUpdated,
+		};
+	}
+
 	// Match exact version if possible
 	let compatibleVersions = modInfo.versions.filter((version) => {
 		return version.gameVersions.some(isVersionExactMatch);
@@ -611,6 +658,7 @@ function resolveBestVersions(modConfig, modInfo) {
 		id: modConfig.id,
 		title: modInfo.title,
 		url: modConfig.url,
+		lockToVersion: modConfig.lockToVersion,
 		currentVersion: modConfig.currentVersion,
 		gameVersion: modConfig.gameVersion,
 		targetVersion,
