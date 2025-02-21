@@ -62,7 +62,14 @@ async function main() {
 			}
 		}
 
-		resolvedVersionInfo[modId] = resolveBestVersions(resolvedDependencies[modId], modInfo);
+		const resolved = resolveBestVersions(resolvedDependencies[modId], modInfo);
+		resolvedVersionInfo[modId] = resolved;
+
+		let logStr = `${modInfo.title} (${modId})    `;
+		logStr += `Current: ${resolvedDependencies[modId].currentVersion || "Not installed"}    `;
+		if (resolved.lockToVersion) logStr += `🔒 `;
+		logStr += `Online: ${resolved.targetVersion?.version || "Not found"}    `;
+		console.log(logStr);
 	}
 
 	console.log(`\n\n`);
@@ -70,34 +77,60 @@ async function main() {
 	await performUpdates(modsConfig, resolvedVersionInfo);
 	modsConfig = readModsConfig();
 
-	reportNonVersionMatch(modsConfig);
+	reportQuestionableVersions(modsConfig);
 }
 
-function reportNonVersionMatch(modsConfig) {
-	const nonMatches = {};
+function reportQuestionableVersions(modsConfig) {
+	const lockedMods = {};
+	const nonMinorMatches = {};
+	const nonExactMatches = {};
 
 	for (const id in modsConfig) {
 		const modConfig = modsConfig[id];
 		const gameVersions = modConfig.gameVersion?.split(", ") || [];
 
-		const hasMatch = gameVersions.some(isVersionExactMatch);
+		// Check for locked versions
+		if (modConfig.lockToVersion) {
+			lockedMods[id] = modConfig;
+		}
 
-		if (!hasMatch) {
-			nonMatches[id] = modConfig;
+		// Check for version mismatches
+		const versionMinorMatches = gameVersions.some(isVersionMinorMatch);
+		const versionExactMatches = gameVersions.some(isVersionExactMatch);
+
+		if (!versionMinorMatches) {
+			nonMinorMatches[id] = modConfig;
+		} else if (!versionExactMatches) {
+			nonExactMatches[id] = modConfig;
 		}
 	}
 
-	let log = "";
-	for (const id in nonMatches) {
-		const modConfig = nonMatches[id];
-		log += `- ${modConfig.title} (${id})\n`;
-		log += `    Version: ${modConfig.version}\n`;
-		log += `    Supported Versions: ${modConfig.gameVersion}\n`;
+	if (Object.keys(lockedMods).length) {
+		console.log(`\n🔒 Version locked mods:`);
+		for (const id in lockedMods) {
+			const modConfig = lockedMods[id];
+			console.log(`- ${modConfig.title} (${id})    Version: ${modConfig.lockToVersion}`);
+		}
 	}
 
-	if (log) {
-		console.log(`\nMods not declared for game version ${GAME_VERSION}:`);
-		console.log(log);
+	if (Object.keys(nonMinorMatches).length) {
+		console.log(`\n🚫 Version major/minor mismatch:`);
+		for (const id in nonMinorMatches) {
+			const modConfig = nonMinorMatches[id];
+			console.log(
+				`- ${modConfig.title} (${id})    Version: ${modConfig.version}    Supported: ${modConfig.gameVersion}`,
+			);
+		}
+	}
+
+	if (Object.keys(nonExactMatches).length) {
+		console.log(`\n⚠️  Version patch mismatch:`);
+		for (const id in nonExactMatches) {
+			const modConfig = nonExactMatches[id];
+			console.log(
+				`- ${modConfig.title} (${id})    Version: ${modConfig.version}    Supported: ${modConfig.gameVersion}`,
+			);
+		}
 	}
 }
 
@@ -109,6 +142,7 @@ async function performUpdates(modsConfig, resolvedVersionInfo) {
 	let logDeleted = "";
 
 	const now = moment();
+	const currentTime = new Date().toISOString();
 
 	// Download new mods
 	const sortedVersionInfo = Object.values(resolvedVersionInfo).sort((a, b) => {
@@ -121,8 +155,11 @@ async function performUpdates(modsConfig, resolvedVersionInfo) {
 			const lastUpdated = moment(modInfo.lastUpdated);
 			const diff = now.diff(lastUpdated, "hours");
 			if (diff < CACHE_TIME_HOURS) {
-				// Copy over and continue
-				newModsConfig[modInfo.id] = modsConfig[modInfo.id];
+				// Copy over and continue, but update lastUpdated
+				newModsConfig[modInfo.id] = {
+					...modsConfig[modInfo.id],
+					lastUpdated: currentTime,
+				};
 				continue;
 			}
 		}
@@ -166,7 +203,7 @@ async function performUpdates(modsConfig, resolvedVersionInfo) {
 				version: modInfo.targetVersion.version,
 				gameVersion: modInfo.targetVersion.gameVersions.join(", "),
 				requires: modInfo.requires,
-				lastUpdated: new Date().toISOString(),
+				lastUpdated: currentTime,
 				auto: modInfo.auto,
 			};
 		} else if (modInfo.action === "up-to-date") {
@@ -179,7 +216,7 @@ async function performUpdates(modsConfig, resolvedVersionInfo) {
 				version: modInfo.currentVersion,
 				gameVersion: modInfo.gameVersion,
 				requires: modInfo.requires,
-				lastUpdated: new Date().toISOString(),
+				lastUpdated: currentTime,
 				auto: modInfo.auto,
 			};
 		}
@@ -490,23 +527,6 @@ async function fetchModInfo(modConfig) {
 	}
 }
 
-/* TODO: Some thoughts on how to improve the version selector.
-
-Leave this dev note here for now until we confirm a working solution. Update this comment if you are revising the algorithms.
-
-- Need a version splitter function.
-  - Splits a version string into 4: major, minor, patch, and extra parts
-
-- Need a version sort-comparator function. Old versionMinorMatches didnt really make the code clear. This comparator will be much better to understand.
-  - Compares two versions (-1, 0, 1):
-  - Major have highest rank
-  - Minor next rank
-  - Patch last rank (All "-" tags, like "-rc.4", are considered the same rank)
-
-- bestModInfo should always be the newest version, but not exceeding the GAME_VERSION
-  - If (!bestModInfo), pick the first one seen (implies the newest version available)
-*/
-
 function splitVersion(version) {
 	// Split base version from extra tag
 	const [base, ...extraParts] = version.split("-");
@@ -571,16 +591,12 @@ function isVersionBelow(version) {
 }
 
 function resolveBestVersions(modConfig, modInfo) {
-	console.log(modInfo.title);
-	console.log(`Current: ${modConfig.currentVersion || "Not installed"}`);
-
 	// If lockToVersion is specified, only look for that version
 	if (modConfig.lockToVersion) {
-		console.log(`Locked to version: ${modConfig.lockToVersion}`);
 		const lockedVersion = modInfo.versions.find((version) => version.version === modConfig.lockToVersion);
 
 		if (!lockedVersion) {
-			console.log(`Warning: Locked version ${modConfig.lockToVersion} not found in available versions`);
+			console.log(`⚠️ Warning: Locked version ${modConfig.lockToVersion} not found in available versions`);
 			return {
 				id: modConfig.id,
 				title: modInfo.title,
@@ -644,14 +660,13 @@ function resolveBestVersions(modConfig, modInfo) {
 	compatibleVersions.sort((a, b) => -compareVersions(a.version, b.version));
 
 	// Choose best version
-	const bestVersion = compatibleVersions[0];
 	let action = "up-to-date";
-	let targetVersion = bestVersion;
+	let targetVersion = compatibleVersions[0];
 	let changeLog = null;
 
-	if (modConfig.currentVersion !== bestVersion.version) {
+	if (modConfig.currentVersion !== targetVersion.version) {
 		action = "update";
-		changeLog = compileChangeLog(modInfo.versions, modConfig.currentVersion, bestVersion.version);
+		changeLog = compileChangeLog(modInfo.versions, modConfig.currentVersion, targetVersion.version);
 	}
 
 	return {
