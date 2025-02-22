@@ -36,10 +36,17 @@ async function main() {
 		if (modConfig.lastUpdated) {
 			const lastUpdated = moment(modConfig.lastUpdated);
 			const diff = now.diff(lastUpdated, "hours");
+			console.log(`[${modConfig.id}] Cache age: ${diff} hours`);
 			if (diff < CACHE_TIME_HOURS - 1) {
+				console.log(
+					`[${modConfig.id}] Using cached mod info (${CACHE_TIME_HOURS - 1 - diff} hours until expiry)`,
+				);
 				modInfos[modConfig.id] = modConfig;
 				continue;
 			}
+			console.log(`[${modConfig.id}] Cache expired, fetching fresh data...`);
+		} else {
+			console.log(`[${modConfig.id}] No cache data, fetching for first time...`);
 		}
 
 		const modInfo = await fetchModInfo(modConfig);
