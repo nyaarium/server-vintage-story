@@ -178,7 +178,7 @@ async function performUpdates(modsConfig, resolvedVersionInfo) {
 			const zipFile = await response.arrayBuffer();
 
 			if (modInfo.currentVersion) {
-				logUpdated += `- ${modInfo.title} (${modInfo.id})  ${modInfo.currentVersion}  ->  ${modInfo.targetVersion.version}\n\n`;
+				logUpdated += `- ${modInfo.title} (${modInfo.id})  ${modInfo.currentVersion}  ->  ${modInfo.targetVersion.version}\n`;
 
 				let changelog = modInfo.changeLog.trim();
 				if (changelog) {
