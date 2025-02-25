@@ -459,7 +459,9 @@ async function fetchModInfo(modConfig) {
 					.split("\n")
 					.map((line) => line.trim())
 					.filter((line) => line)
-					.join("\n");
+					.join("\n")
+					.replace(/-----BEGIN PGP SIGNATURE-----[\s\S]*?-----END PGP SIGNATURE-----/g, "")
+					.trim();
 
 				const $gameVersionTags = $gameVersionCell.find(".tag");
 				let gameVersions = [];
