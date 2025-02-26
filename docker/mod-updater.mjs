@@ -14,6 +14,10 @@ const MOST_RECENT_ENTRIES_COUNT = 20;
 
 const CACHE_TIME_HOURS = 4;
 
+let discordClient = null;
+let discordChannels = [];
+let hasPostedTitle = false;
+
 // Start the main function
 main().catch((error) => {
 	console.error("Mod updater failed:", error);
@@ -271,10 +275,6 @@ async function performUpdates(modsConfig, resolvedVersionInfo) {
 
 	console.log("Done!");
 }
-
-let discordClient = null;
-let discordChannels = [];
-let hasPostedTitle = false;
 
 async function discordPost(message) {
 	try {
