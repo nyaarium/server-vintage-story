@@ -143,10 +143,9 @@ function reportQuestionableVersions(modsConfig) {
 
 async function performUpdates(modsConfig, resolvedVersionInfo) {
 	const newModsConfig = {};
-	let logUpToDate = "";
-	let logInstalled = "";
-	let logUpdated = "";
-	let logDeleted = "";
+	const installedEntries = [];
+	const deletedEntries = [];
+	let hasPostedUpdateHeader = false;
 
 	const now = moment();
 	const currentTime = new Date().toISOString();
@@ -184,20 +183,24 @@ async function performUpdates(modsConfig, resolvedVersionInfo) {
 			const response = await fetch(url);
 			const zipFile = await response.arrayBuffer();
 
-			if (modInfo.currentVersion) {
-				logUpdated += `- ${modInfo.title} (${modInfo.id})  ${modInfo.currentVersion}  ->  ${modInfo.targetVersion.version}\n`;
+			await fs.promises.writeFile(downloadPath, Buffer.from(zipFile));
 
-				let changelog = modInfo.changeLog.trim();
-				if (changelog) {
-					changelog = "  > " + changelog.replace(/\n/gs, "\n  > ");
+			if (modInfo.currentVersion) {
+				if (!hasPostedUpdateHeader) {
+					// Post update header if not done yet
+					await discordPost("✅ **Updated:**");
+					hasPostedUpdateHeader = true;
 				}
 
-				logUpdated += `${changelog}\n\n`;
+				// Post individual update
+				let message = `**${modInfo.title}**  (\`${modInfo.id}\`)  **${modInfo.currentVersion}**  ->  **${modInfo.targetVersion.version}**\n`;
+				if (modInfo.changeLog) {
+					message += "> " + modInfo.changeLog.replace(/\n/gs, "\n> ") + "\n";
+				}
+				await discordPost(message);
 			} else {
-				logInstalled += `- ${modInfo.title} (${modInfo.id})  ${modInfo.targetVersion.version}\n`;
+				installedEntries.push(`- ${modInfo.title} (${modInfo.id})  ${modInfo.targetVersion.version}`);
 			}
-
-			await fs.promises.writeFile(downloadPath, Buffer.from(zipFile));
 
 			// Pause for 5 seconds out of kindness for CDN
 			await new Promise((resolve) => setTimeout(resolve, 5000));
@@ -214,8 +217,6 @@ async function performUpdates(modsConfig, resolvedVersionInfo) {
 				auto: modInfo.auto,
 			};
 		} else if (modInfo.action === "up-to-date") {
-			logUpToDate += `- ${modInfo.title} (${modInfo.id})\n`;
-
 			newModsConfig[modInfo.id] = {
 				title: modInfo.title,
 				url: modInfo.url,
@@ -249,106 +250,135 @@ async function performUpdates(modsConfig, resolvedVersionInfo) {
 	}
 	for (const modId in unlistedMods) {
 		fs.unlinkSync(`${MODS_DIR}/${modId}.zip`);
-		logDeleted += `- ${modId}\n`;
+		deletedEntries.push(`- ${modId}`);
 	}
 
 	// Write the updated config
 	fs.writeFileSync(MODS_JSON_PATH, JSON5.stringify(newModsConfig, null, 4).replace(/ {4}/g, "\t"));
-	// console.log(JSON5.stringify(newModsConfig, null, 4).replace(/ {4}/g, "\t"));
 
-	let log = "";
-
-	if (logInstalled) {
-		log += `\n\n✅ Newly installed:\n\n${logInstalled}`;
-	}
-	if (logUpdated) {
-		log += `\n\n✅ Updated:\n\n${logUpdated}`;
-	}
-	if (logDeleted) {
-		log += `\n\n❌ Deleted:\n\n${logDeleted}`;
+	// Post collected entries if any
+	if (installedEntries.length) {
+		await discordPost("\n**✅ Newly installed:**\n- " + installedEntries.join("\n- "));
 	}
 
-	console.log(logUpToDate ? `\n\n✅ Up to date:\n\n${logUpToDate}` : "" + log);
+	if (deletedEntries.length) {
+		await discordPost("\n**❌ Deleted:**\n- " + deletedEntries.join("\n- "));
+	}
 
-	// Send Discord notification if there are updates
-	if (logInstalled || logUpdated || logDeleted) {
-		console.log("\nAttempting Discord notification...");
-
-		let discordConfig = null;
-		try {
-			if (fs.existsSync(DISCORD_CONFIG_PATH)) {
-				discordConfig = JSON5.parse(fs.readFileSync(DISCORD_CONFIG_PATH, "utf8"));
-				console.log("Discord config loaded:", {
-					hasSecretKey: !!discordConfig.secretKey,
-					channels: discordConfig.broadcastChannels?.length || 0,
-				});
-			}
-		} catch (error) {
-			console.error("Failed to load Discord config:", error);
-		}
-
-		if (discordConfig?.secretKey && discordConfig?.broadcastChannels?.length) {
-			console.log("Creating Discord client...");
-			const discordClient = new Client({
-				intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent],
-			});
-
-			try {
-				console.log("Attempting Discord login...");
-				await discordClient.login(discordConfig.secretKey);
-
-				// Send to all configured channels
-				for (const channel of discordConfig.broadcastChannels) {
-					try {
-						console.log("Fetching guild...", channel.guildId);
-						const guild = await discordClient.guilds.fetch(channel.guildId);
-						console.log("Guild found:", guild.name);
-						const textChannel = await guild.channels.fetch(channel.channelId);
-						console.log("Channel found:", {
-							name: textChannel?.name,
-							type: textChannel?.type,
-							isText: textChannel?.isTextBased(),
-						});
-
-						if (textChannel?.isTextBased()) {
-							console.log("Channel is text based, sending message...");
-							let message = "**Vintage Story Server Mod Updates**" + log;
-
-							// Split message if it's too long (Discord has 2000 char limit)
-							if (message.length > 1900) {
-								message = message.substring(0, 1900) + "\n... (message truncated)";
-							}
-
-							await textChannel.send(message);
-							console.log("Message sent successfully!");
-						} else {
-							console.log("Channel is not text based! Channel type:", textChannel?.type);
-						}
-					} catch (error) {
-						console.error("Failed to send to channel. Error details:", error);
-						if (error.code) console.error("Error code:", error.code);
-						if (error.message) console.error("Error message:", error.message);
-						if (error.httpStatus) console.error("HTTP status:", error.httpStatus);
-					}
-				}
-			} catch (error) {
-				console.error("Failed to send Discord notification. Error details:", error);
-				if (error.code) console.error("Error code:", error.code);
-				if (error.message) console.error("Error message:", error.message);
-				if (error.httpStatus) console.error("HTTP status:", error.httpStatus);
-			} finally {
-				console.log("Cleaning up Discord client...");
-				await discordClient.destroy();
-				console.log("Discord client destroyed.");
-			}
-		} else {
-			console.log("No Discord config found or missing required fields.");
-		}
-	} else {
-		console.log("No updates to report to Discord.");
+	if (discordClient) {
+		await discordClient.destroy();
 	}
 
 	console.log("Done!");
+}
+
+let discordClient = null;
+let discordChannels = [];
+let hasPostedTitle = false;
+
+async function discordPost(message) {
+	try {
+		// Skip if no Discord config
+		if (!fs.existsSync(DISCORD_CONFIG_PATH)) {
+			console.log("[Discord] No Discord config found, skipping notification");
+			return;
+		}
+
+		// Initialize client if needed
+		if (!discordClient) {
+			try {
+				const discordConfig = JSON5.parse(fs.readFileSync(DISCORD_CONFIG_PATH, "utf8"));
+				if (!discordConfig?.secretKey || !discordConfig?.broadcastChannels?.length) {
+					console.log("[Discord] Discord config is missing required fields");
+					return;
+				}
+
+				console.log("[Discord] Initializing Discord client...");
+				discordClient = new Client({
+					intents: [
+						GatewayIntentBits.Guilds,
+						GatewayIntentBits.GuildMessages,
+						GatewayIntentBits.MessageContent,
+					],
+				});
+
+				await discordClient.login(discordConfig.secretKey);
+
+				// Fetch all channels
+				for (const channel of discordConfig.broadcastChannels) {
+					try {
+						const guild = await discordClient.guilds.fetch(channel.guildId);
+						const textChannel = await guild.channels.fetch(channel.channelId);
+
+						if (!textChannel?.isTextBased()) {
+							console.log(`[Discord] Channel ${channel.channelId} is not a text channel, skipping`);
+							continue;
+						}
+
+						// Store error state on the channel object
+						textChannel.error = null;
+						discordChannels.push(textChannel);
+					} catch (channelError) {
+						console.error(`[Discord] Failed to fetch channel ${channel.channelId}:`, channelError.message);
+					}
+				}
+
+				if (!discordChannels.length) {
+					throw new Error("[Discord] No valid channels found");
+				}
+			} catch (initError) {
+				console.error("[Discord] Failed to initialize Discord client:", initError.message);
+
+				// Cleanup on initialization failure
+				if (discordClient) {
+					await discordClient.destroy();
+					discordClient = null;
+				}
+				discordChannels = [];
+				return;
+			}
+		}
+
+		if (!hasPostedTitle) {
+			console.log("[Discord] Posting title...");
+			for (const channel of discordChannels) {
+				if (!channel.error) {
+					try {
+						await channel.send("## Vintage Story Server Mod Updates");
+					} catch (sendError) {
+						console.error(`[Discord] Failed to send title to channel ${channel.id}:`, sendError.message);
+						channel.error = true;
+					}
+				}
+			}
+			hasPostedTitle = true;
+		}
+
+		// Send to all channels that haven't errored
+		console.log("[Discord] Sending message to channels...");
+		for (const channel of discordChannels) {
+			if (!channel.error) {
+				try {
+					await channel.send(message);
+					console.log(`[Discord] Message sent to channel ${channel.id}`);
+				} catch (sendError) {
+					console.error(`[Discord] Failed to send message to channel ${channel.id}:`, sendError.message);
+					channel.error = true;
+				}
+			} else {
+				console.log(`[Discord] Skipping errored channel ${channel.id}`);
+			}
+		}
+	} catch (error) {
+		console.error("[Discord] Unexpected error in discordPost:", error.message);
+
+		// Cleanup on unexpected error
+		if (discordClient) {
+			await discordClient.destroy();
+			discordClient = null;
+		}
+		discordChannels = [];
+	}
 }
 
 function readModsConfig() {
