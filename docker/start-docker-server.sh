@@ -41,7 +41,7 @@ LOG_FILE_NEXT="output-last.log"
 
 # Start monitor
 pushd /monitor
-node server.js &
+node monitor.mjs &
 child_monitor=$!
 popd
 

@@ -1,11 +1,12 @@
-const JSON5 = require("json5");
-const fs = require("fs");
-const path = require("path");
-const moment = require("moment");
-const http = require("http");
-const express = require("express");
-const helmet = require("helmet");
-const spawn = require("cross-spawn");
+import { spawn } from "cross-spawn";
+import express from "express";
+import fs from "fs";
+import helmet from "helmet";
+import http from "http";
+import JSON5 from "json5";
+import moment from "moment";
+import path from "path";
+import process from "process";
 
 ////////////////////////////////////////////////////////////////
 // In case certain apps return a stupid date format.
