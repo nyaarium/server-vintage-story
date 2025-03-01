@@ -7,6 +7,8 @@ _term() {
 	echo "Caught kill signal! Gracefully shutting down."
 
 	echo "/stop" > input.fifo
+
+	was_gracefully_killed=true
 	
 	# Wait for server to finish saving (up to 25 seconds)
 	for i in {1..25}; do
@@ -16,9 +18,19 @@ _term() {
 		sleep 1
 	done
 
-	kill -TERM "$child_monitor" 2>/dev/null
+	# Really die please
+	if kill -0 "$child_server" 2>/dev/null; then
+		was_gracefully_killed=false
+		kill -9 "$child_server" || true
+	fi
 
-	echo "Server shutdown complete."
+	kill -9 "$child_monitor" || true
+
+	if $was_gracefully_killed; then
+		echo "Server shutdown complete."
+	else
+		echo "Server forcefully killed."
+	fi
 }
 trap _term TERM INT
 
@@ -53,7 +65,6 @@ child_server=$!
 
 # Wait for server to finish and kill monitor
 wait "$child_server"
-kill -TERM "$child_monitor" 2>/dev/null
 
 
 # Rotate logs
