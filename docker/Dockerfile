@@ -34,8 +34,6 @@ RUN NODE_MAJOR=22 \
 	&& apt install -y nodejs \
 	&& apt clean && rm -rf /var/lib/apt/lists/*
 
-RUN cd /root && npm i json5 node-fetch cheerio moment moment-timezone discord.js
-
 COPY install.sh /root/install.sh
 RUN chmod +x /root/install.sh \
 	&& /root/install.sh \
@@ -45,11 +43,13 @@ COPY start-docker-server.sh /app/start-docker-server.sh
 RUN chmod +x /app/start-docker-server.sh
 
 COPY monitor/ /monitor/
-RUN cd /monitor/ \
+RUN cd /monitor \
 	&& chmod +x *.sh \
-	&& npm i
+	&& npm i cross-spawn express helmet json5 moment moment-timezone
 
 COPY mod-updater.mjs /root/mod-updater.mjs
+RUN cd /root \
+	&& npm i cheerio discord.js json5 moment moment-timezone node-fetch
 
 WORKDIR /app
 CMD ["/app/start-docker-server.sh"]
