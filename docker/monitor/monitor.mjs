@@ -1,17 +1,17 @@
-import { spawn } from "cross-spawn";
 import express from "express";
 import fs from "fs";
 import helmet from "helmet";
 import http from "http";
-import JSON5 from "json5";
-import path from "path";
 import process from "process";
-import { sanitizeServerStatus } from "./log-parser.mjs";
+import { readServerLog, sanitizeServerStatus } from "./log-parser.mjs";
 
 let LOG_FILE = `/app/output.log`;
 
 // DEBUG
 if (fs.existsSync(`./output.log`)) {
+	console.log(`\n\n============================`);
+	console.log(`DEBUG: Using ./output.log as the test log file`);
+	console.log(`============================\n\n`);
 	LOG_FILE = `./output.log`;
 }
 
@@ -54,63 +54,11 @@ try {
 }
 
 async function pollServer() {
-	const res = await run(path.join(process.cwd(), `poll-log.sh`));
-	const json = JSON5.parse(res.stdout);
+	// Read and parse the server log directly using the new function
+	const statusData = readServerLog(LOG_FILE);
 
-	// Process and sanitize the server status JSON
-	return sanitizeServerStatus(json);
-}
-
-async function run(script, params = []) {
-	let log = ""; //  Both out/err in the order they appeared in
-	let stdout = "";
-	let stderr = "";
-
-	const pr = createPromise();
-
-	const child = spawn(script, params);
-	child.on("exit", (code) => {
-		const data = {
-			log,
-			stdout,
-			stderr,
-		};
-
-		if (code === 0) {
-			pr.resolve(data);
-		} else {
-			console.log(log);
-			pr.reject();
-		}
-	});
-
-	child.stdout.setEncoding("utf8");
-	child.stderr.setEncoding("utf8");
-
-	child.stdout.on("data", function (data) {
-		stdout += data;
-		log += data;
-	});
-
-	child.stderr.on("data", function (data) {
-		stderr += data;
-		log += data;
-	});
-
-	return pr.promise;
-}
-
-function createPromise() {
-	let resolve, reject;
-	let promise = new Promise((rs, rj) => {
-		resolve = rs;
-		reject = rj;
-	});
-	return {
-		promise,
-		resolve,
-		reject,
-	};
+	// Process and sanitize the server status
+	return sanitizeServerStatus(statusData);
 }
 
 process.once("SIGINT", function (code) {

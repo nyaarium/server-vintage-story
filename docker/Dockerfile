@@ -50,7 +50,7 @@ RUN chmod +x /root/install.sh \
 COPY monitor/ /monitor/
 RUN cd /monitor \
 	&& chmod +x *.sh \
-	&& npm i cross-spawn express helmet json5 moment moment-timezone
+	&& npm i express helmet moment moment-timezone
 
 
 ############################
