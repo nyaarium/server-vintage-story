@@ -4,22 +4,9 @@ import fs from "fs";
 import helmet from "helmet";
 import http from "http";
 import JSON5 from "json5";
-import moment from "moment";
 import path from "path";
 import process from "process";
-
-////////////////////////////////////////////////////////////////
-// In case certain apps return a stupid date format.
-// Adjust this date fixer per game service.
-//
-function fixDate(str) {
-	// Ex: 2.5.2023 21:33:53
-	const [p1, p2, p3] = str.split(".");
-	return [p2, p1, p3].join("/");
-	// return str;
-}
-//
-////////////////////////////////////////////////////////////////
+import { sanitizeServerStatus } from "./log-parser.mjs";
 
 let LOG_FILE = `/app/output.log`;
 
@@ -70,31 +57,8 @@ async function pollServer() {
 	const res = await run(path.join(process.cwd(), `poll-log.sh`));
 	const json = JSON5.parse(res.stdout);
 
-	// {
-	// 	"status": "running",
-	// 	"uptime": {
-	// 		"date":"2024-06-24 09:11:11",
-	// 	},
-	// 	"info": {
-	// 		"players": 0,
-	// 	},
-	// }
-	if (typeof json.uptime === "object") {
-		let uptime = json.uptime;
-		if (uptime) {
-			if (uptime.date) {
-				uptime = moment(new Date(fixDate(uptime.date))).unix();
-			} else if (uptime.iso) {
-				uptime = moment(fixDate(uptime.iso)).unix();
-			} else if (uptime.unix) {
-				uptime = Number(uptime.unix);
-			}
-
-			json.uptime = uptime;
-		}
-	}
-
-	return json;
+	// Process and sanitize the server status JSON
+	return sanitizeServerStatus(json);
 }
 
 async function run(script, params = []) {
