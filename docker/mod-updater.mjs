@@ -147,20 +147,35 @@ function reportQuestionableVersions(modsConfig) {
 
 async function performUpdates(modsConfig, resolvedVersionInfo) {
 	const newModsConfig = {};
+	const disabledMods = {};
 	const installedEntries = [];
+	const uninstalledEntries = [];
 	const deletedEntries = [];
 	let hasPostedUpdateHeader = false;
 
 	const now = moment();
 	const currentTime = new Date().toISOString();
 
-	// Download new mods
 	const sortedVersionInfo = Object.values(resolvedVersionInfo).sort((a, b) => {
 		const titleA = a.title?.toLowerCase() ?? "";
 		const titleB = b.title?.toLowerCase() ?? "";
 		return titleA.localeCompare(titleB);
 	});
+
 	for (const modInfo of sortedVersionInfo) {
+		if (modInfo.disabled) {
+			disabledMods[modInfo.id] = modInfo;
+
+			newModsConfig[modInfo.id] = {
+				...modsConfig[modInfo.id],
+			};
+
+			delete newModsConfig[modInfo.id].version;
+			delete newModsConfig[modInfo.id].gameVersion;
+
+			continue;
+		}
+
 		if (modInfo.lastUpdated) {
 			const lastUpdated = moment(modInfo.lastUpdated);
 			const diff = now.diff(lastUpdated, "hours");
@@ -211,6 +226,7 @@ async function performUpdates(modsConfig, resolvedVersionInfo) {
 
 			// If manually specified, save the new version to the config
 			newModsConfig[modInfo.id] = {
+				...(modInfo.disabled ? { disabled: true } : {}),
 				title: modInfo.title,
 				url: modInfo.url,
 				lockToVersion: modInfo.lockToVersion,
@@ -222,6 +238,7 @@ async function performUpdates(modsConfig, resolvedVersionInfo) {
 			};
 		} else if (modInfo.action === "up-to-date") {
 			newModsConfig[modInfo.id] = {
+				...(modInfo.disabled ? { disabled: true } : {}),
 				title: modInfo.title,
 				url: modInfo.url,
 				lockToVersion: modInfo.lockToVersion,
@@ -234,7 +251,17 @@ async function performUpdates(modsConfig, resolvedVersionInfo) {
 		}
 	}
 
-	// Scan dir for modIds of mods to delete
+	fs.readdirSync(MODS_DIR).forEach((file) => {
+		const modId = file.split(".")[0];
+		if (disabledMods[modId]) {
+			fs.unlinkSync(`${MODS_DIR}/${modId}.zip`);
+
+			console.log(`Uninstalling ${newModsConfig[modId].title} (${modId})`);
+			uninstalledEntries.push(`- ${newModsConfig[modId].title} (${modId})`);
+		}
+	});
+
+	// Scan dir for modIds of non-existing mods to delete
 	const unlistedMods = {};
 	fs.readdirSync(MODS_DIR).forEach((file) => {
 		const modId = file.split(".")[0];
@@ -263,6 +290,10 @@ async function performUpdates(modsConfig, resolvedVersionInfo) {
 	// Post collected entries if any
 	if (installedEntries.length) {
 		await discordPost("\n**✅ Newly installed:**\n- " + installedEntries.join("\n- "));
+	}
+
+	if (uninstalledEntries.length) {
+		await discordPost("\n**❌ Uninstalled:**\n- " + uninstalledEntries.join("\n- "));
 	}
 
 	if (deletedEntries.length) {
@@ -414,12 +445,14 @@ function resolveDependencies(modConfig) {
 		const id = url.split("/").pop();
 
 		if (modLookup[id]) {
+			modLookup[id].disabled = modInfo.disabled;
 			modLookup[id].lockToVersion = modInfo.lockToVersion;
 			modLookup[id].currentVersion = modInfo.version;
 			modLookup[id].gameVersion = modInfo.gameVersion;
 			modLookup[id].lastUpdated = modInfo.lastUpdated;
 		} else {
 			modLookup[id] = {
+				disabled: modInfo.disabled,
 				id,
 				url,
 				lockToVersion: modInfo.lockToVersion,
@@ -438,6 +471,7 @@ function resolveDependencies(modConfig) {
 				if (!modLookup[requireId]) {
 					const reqConfig = modConfig[requireId];
 					modLookup[requireId] = {
+						disabled: reqConfig?.disabled,
 						id: requireId,
 						url: requireUrl,
 						lockToVersion: reqConfig?.lockToVersion,
@@ -637,6 +671,7 @@ function resolveBestVersions(modConfig, modInfo) {
 		if (!lockedVersion) {
 			console.log(`⚠️ Warning: Locked version ${modConfig.lockToVersion} not found in available versions`);
 			return {
+				...(modConfig.disabled ? { disabled: true } : {}),
 				id: modConfig.id,
 				title: modInfo.title,
 				url: modConfig.url,
@@ -653,6 +688,7 @@ function resolveBestVersions(modConfig, modInfo) {
 		}
 
 		return {
+			...(modConfig.disabled ? { disabled: true } : {}),
 			id: modConfig.id,
 			title: modInfo.title,
 			url: modConfig.url,
@@ -709,6 +745,7 @@ function resolveBestVersions(modConfig, modInfo) {
 	}
 
 	return {
+		...(modConfig.disabled ? { disabled: true } : {}),
 		id: modConfig.id,
 		title: modInfo.title,
 		url: modConfig.url,
