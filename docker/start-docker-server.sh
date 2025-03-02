@@ -18,13 +18,15 @@ _term() {
 		sleep 1
 	done
 
-	# Really die please
+	# If server is still running, force kill it
 	if kill -0 "$child_server" 2>/dev/null; then
 		was_gracefully_killed=false
 		kill -9 "$child_server" || true
 	fi
 
 	kill -9 "$child_monitor" || true
+
+	[ -p "input.fifo" ] && rm input.fifo
 
 	if $was_gracefully_killed; then
 		echo "Server shutdown complete."
