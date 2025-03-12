@@ -1,0 +1,10 @@
+---
+description: Development notes and guidelines for the Nyaarium App Server
+globs: *.json5, docker/**
+alwaysApply: false
+---
+# Development Notes
+
+- Server runs in Docker with volume mounts for persistence
+- Uses Node.js within the Docker container for server monitoring and mod management
+- Configuration files are in JSON5 format

@@ -1,0 +1,17 @@
+---
+description: Project structure of the Nyaarium App Server
+globs: data/**, docker/**
+alwaysApply: false
+---
+# Project Structure
+
+- `data/` - Server data and world files
+- `docker/`
+  - `monitor/` - Node.js server monitor
+    - `log-parser.mjs` - Vendor specific log parser
+    - `monitor.mjs` - Monitor server that reports status to the web
+    - `poll-log.sh` - Log polling utility
+  - `Dockerfile` - Docker container configuration
+  - `install.sh` - Downloads and extracts server files to `data/` volume
+  - `mod-updater.mjs` - (If present) Mod update utility
+  - `start-docker-server.sh` - Main container entrypoint 
