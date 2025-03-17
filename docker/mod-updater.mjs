@@ -218,7 +218,7 @@ async function performUpdates(modsConfig, resolvedVersionInfo) {
 				}
 				await discordPost(message);
 			} else {
-				installedEntries.push(`- ${modInfo.title} (${modInfo.id})  ${modInfo.targetVersion.version}`);
+				installedEntries.push(`${modInfo.title} (${modInfo.id})  ${modInfo.targetVersion.version}`);
 			}
 
 			// Pause for 5 seconds out of kindness for CDN
@@ -257,7 +257,7 @@ async function performUpdates(modsConfig, resolvedVersionInfo) {
 			fs.unlinkSync(`${MODS_DIR}/${modId}.zip`);
 
 			console.log(`Uninstalling ${newModsConfig[modId].title} (${modId})`);
-			uninstalledEntries.push(`- ${newModsConfig[modId].title} (${modId})`);
+			uninstalledEntries.push(`${newModsConfig[modId].title} (${modId})`);
 		}
 	});
 
@@ -281,7 +281,7 @@ async function performUpdates(modsConfig, resolvedVersionInfo) {
 	}
 	for (const modId in unlistedMods) {
 		fs.unlinkSync(`${MODS_DIR}/${modId}.zip`);
-		deletedEntries.push(`- ${modId}`);
+		deletedEntries.push(`${modId}`);
 	}
 
 	// Write the updated config
