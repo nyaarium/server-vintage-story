@@ -712,13 +712,6 @@ function resolveBestVersions(modConfig, modInfo) {
 		return version.gameVersions.some(isVersionExactMatch);
 	});
 
-	// If not, match major.minor and any patch versions
-	if (!compatibleVersions.length) {
-		compatibleVersions = modInfo.versions.filter((version) => {
-			return version.gameVersions.some(isVersionMinorMatch);
-		});
-	}
-
 	// If not, match the first version below the current version
 	if (!compatibleVersions.length) {
 		compatibleVersions = modInfo.versions.filter((version) => {
