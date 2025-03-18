@@ -500,7 +500,7 @@ async function fetchModInfo(modConfig) {
 		const html = await response.text();
 
 		const $ = cheerio.load(html);
-		const title = $("span.title").eq(0).text().replace(/\s+/gs, " ").trim();
+		const title = $(".mod-published > h2 > span").eq(1).text().replace(/\s+/gs, " ").trim();
 		const $table = $(`table[id="Connection types"]`);
 
 		const versions = [];
