@@ -56,7 +56,7 @@ COMMAND=(
 	dotnet
 	VintagestoryServer.dll
 	--dataPath
-	/data/saves
+	/data/Saves
 )
 
 
