@@ -19,7 +19,9 @@ fi
 
 docker run --rm -i \
     --name $APP_NAME \
-    -v "$(pwd)/data:/data" \
+    -v "$(pwd)/data/saves:/var/data/saves" \
+    -v "$(pwd)/data/mods:/var/data/saves/Mods" \
+    -v "$(pwd)/data/logs:/var/data/logs" \
     -v "$(pwd)/mods.json5:/configs/mods.json5" \
     ${DISCORD_VOL} \
     $APP_NAME \

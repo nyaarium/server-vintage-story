@@ -40,16 +40,19 @@ RUN wget https://dot.net/v1/dotnet-install.sh -O dotnet-install.sh \
 
 
 ############################
-# Monitor server
+# Game server
 
 COPY install.sh /root/install.sh
 RUN chmod +x /root/install.sh \
 	&& /root/install.sh \
 	&& rm /root/install.sh
 
+
+############################
+# Monitor server
+
 COPY monitor/ /monitor/
 RUN cd /monitor \
-	&& chmod +x *.sh \
 	&& npm i express helmet moment moment-timezone
 
 

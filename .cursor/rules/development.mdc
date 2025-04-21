@@ -1,7 +1,7 @@
 ---
-description: Development notes and guidelines for the Nyaarium App Server
-globs: *.json5, docker/**
-alwaysApply: false
+description: 
+globs: 
+alwaysApply: true
 ---
 # Development Notes
 

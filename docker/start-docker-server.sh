@@ -25,6 +25,7 @@ _term() {
 	fi
 
 	kill -9 "$child_monitor" || true
+	# kill -9 "$child_log_viewer" || true
 
 	[ -p "input.fifo" ] && rm input.fifo
 
@@ -36,8 +37,8 @@ _term() {
 }
 trap _term TERM INT
 
-LOG_FILE_CURRENT="output.log"
-LOG_FILE_NEXT="output-last.log"
+LOG_FILE_CURRENT="/var/data/logs/output.log"
+LOG_FILE_NEXT="/var/data/logs/output-last.log"
 [ ! -f "$LOG_FILE_CURRENT" ] && touch "$LOG_FILE_CURRENT"
 
 
@@ -55,7 +56,7 @@ COMMAND=(
 	dotnet
 	VintagestoryServer.dll
 	--dataPath
-	/data
+	/data/saves
 )
 
 
@@ -64,9 +65,17 @@ mkfifo input.fifo
 tail -f input.fifo | "${COMMAND[@]}" 2>&1 | tee $LOG_FILE_CURRENT &
 child_server=$!
 
+# Start real-time log viewer (if server is quiet)
+# echo "Starting real-time log viewer..."
+# tail -f /var/data/logs/output.log &
+# child_log_viewer=$!
+
 
 # Wait for server to finish and kill monitor
 wait "$child_server"
+
+# Kill the log viewer
+# kill $child_log_viewer 2>/dev/null || true
 
 
 # Rotate logs

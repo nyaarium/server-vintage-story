@@ -1,7 +1,7 @@
 ---
-description: Project structure of the Nyaarium App Server
-globs: data/**, docker/**
-alwaysApply: false
+description: 
+globs: 
+alwaysApply: true
 ---
 # Project Structure
 
@@ -10,8 +10,11 @@ alwaysApply: false
   - `monitor/` - Node.js server monitor
     - `log-parser.mjs` - Vendor specific log parser
     - `monitor.mjs` - Monitor server that reports status to the web
-    - `poll-log.sh` - Log polling utility
   - `Dockerfile` - Docker container configuration
   - `install.sh` - Downloads and extracts server files to `data/` volume
   - `mod-updater.mjs` - (If present) Mod update utility
   - `start-docker-server.sh` - Main container entrypoint 
+- `run.sh` - Run server in interactive mode. No params will default start the server. With params will call the params instead, like `./run.sh /bin/bash`
+- `send.sh` - If applicable (app server supporting stdin), sends the params as a plain string to the live Docker server stdin
+- `start.sh` - Calls `run.sh` with no params in detached daemon mode, and attaches to Docker logs
+- `stop.sh` - Stops the detached Docker gracefully
