@@ -14,7 +14,7 @@ sleep 1  # Give Docker time to clean up
 
 DISCORD_VOL=""
 if [ -f "discord-config.json5" ]; then
-    DISCORD_VOL="-v $(pwd)/discord-config.json5:/configs/discord-config.json5:ro"
+    DISCORD_VOL="-v $(pwd)/data/discord-config.json5:/data/discord-config.json5:ro"
 fi
 
 docker run --rm -i \
