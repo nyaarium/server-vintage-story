@@ -23,7 +23,7 @@ docker run --rm -it $DETACHED \
     --log-driver local \
     --log-opt max-size=200k \
     --log-opt max-file=3 \
-    -v "$(pwd)/data/saves:/data/Saves" \
+    -v "$(pwd)/data/saves:/data" \
     -v "$(pwd)/data/mods:/data/Mods" \
     -v "$(pwd)/data/logs:/data/logs" \
     -v "$(pwd)/data/mods.json5:/data/mods.json5" \
