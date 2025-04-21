@@ -5,7 +5,7 @@ import http from "http";
 import process from "process";
 import { extractServerInfo, readServerLog } from "./log-parser.mjs";
 
-let LOG_FILE = `/var/data/logs/output.log`;
+let LOG_FILE = `/data/logs/output.log`;
 
 // DEBUG
 if (fs.existsSync(`./output.log`)) {

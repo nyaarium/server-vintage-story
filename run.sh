@@ -22,10 +22,10 @@ docker run --rm -it $DETACHED \
     --log-driver local \
     --log-opt max-size=200k \
     --log-opt max-file=3 \
-    -v "$(pwd)/data/saves:/var/data/saves" \
-    -v "$(pwd)/data/mods:/var/data/saves/Mods" \
-    -v "$(pwd)/data/logs:/var/data/logs" \
-    -v "$(pwd)/data/mods.json5:/var/data/mods.json5" \
+    -v "$(pwd)/data/saves:/data/saves" \
+    -v "$(pwd)/data/mods:/data/saves/Mods" \
+    -v "$(pwd)/data/logs:/data/logs" \
+    -v "$(pwd)/data/mods.json5:/data/mods.json5" \
     -p 8080:8080/tcp \
     -p 42420:42420/tcp \
     $APP_NAME \

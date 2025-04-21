@@ -37,8 +37,8 @@ _term() {
 }
 trap _term TERM INT
 
-LOG_FILE_CURRENT="/var/data/logs/output.log"
-LOG_FILE_NEXT="/var/data/logs/output-last.log"
+LOG_FILE_CURRENT="/data/logs/output.log"
+LOG_FILE_NEXT="/data/logs/output-last.log"
 [ ! -f "$LOG_FILE_CURRENT" ] && touch "$LOG_FILE_CURRENT"
 
 
@@ -67,7 +67,7 @@ child_server=$!
 
 # Start real-time log viewer (if server is quiet)
 # echo "Starting real-time log viewer..."
-# tail -f /var/data/logs/output.log &
+# tail -f /data/logs/output.log &
 # child_log_viewer=$!
 
 
