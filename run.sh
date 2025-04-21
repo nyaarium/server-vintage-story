@@ -25,7 +25,7 @@ docker run --rm -it $DETACHED \
     -v "$(pwd)/data/saves:/var/data/saves" \
     -v "$(pwd)/data/mods:/var/data/saves/Mods" \
     -v "$(pwd)/data/logs:/var/data/logs" \
-    -v "$(pwd)/mods.json5:/configs/mods.json5" \
+    -v "$(pwd)/data/mods.json5:/var/data/mods.json5" \
     -p 8080:8080/tcp \
     -p 42420:42420/tcp \
     $APP_NAME \
