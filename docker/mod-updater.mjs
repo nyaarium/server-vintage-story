@@ -6,7 +6,7 @@ import moment from "moment-timezone";
 import fetch from "node-fetch";
 
 const GAME_VERSION = process.env.GAME_VERSION;
-const MODS_DIR = "/data/Saves/Mods";
+const MODS_DIR = "/data/Mods";
 const MODS_JSON_PATH = "/data/mods.json5";
 const DISCORD_CONFIG_PATH = "/data/discord-config.json5";
 

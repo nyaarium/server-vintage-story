@@ -57,6 +57,8 @@ COMMAND=(
 	VintagestoryServer.dll
 	--dataPath
 	/data/Saves
+	--addModPath
+	/data/Mods
 )
 
 
