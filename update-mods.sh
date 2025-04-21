@@ -5,7 +5,7 @@ export APP_NAME="vintage-story"
 set -e
 cd "$(dirname "$0")"
 
-mkdir -p data
+mkdir -p data/saves data/mods data/logs
 
 docker build -t $APP_NAME docker/
 
