@@ -2,7 +2,7 @@ FROM debian:bookworm
 
 
 # Adjust the game version here
-ENV GAME_VERSION="1.20.7"
+ENV GAME_VERSION="1.20.11"
 
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -39,10 +39,10 @@ RUN NODE_MAJOR=22 \
 ############################
 # App dependencies
 
-RUN wget https://dot.net/v1/dotnet-install.sh -O dotnet-install.sh \
-	&& chmod +x dotnet-install.sh \
-	&& ./dotnet-install.sh --runtime aspnetcore --channel 7.0 \
-	&& apt autoremove --purge -y && apt clean
+# RUN wget https://dot.net/v1/dotnet-install.sh -O dotnet-install.sh \
+# 	&& chmod +x dotnet-install.sh \
+# 	&& ./dotnet-install.sh --runtime aspnetcore --channel 7.0 \
+# 	&& apt autoremove --purge -y && apt clean
 
 
 ############################

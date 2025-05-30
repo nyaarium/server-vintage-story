@@ -243,7 +243,7 @@ async function performUpdates(modsConfig, resolvedVersionInfo) {
 				url: modInfo.url,
 				lockToVersion: modInfo.lockToVersion,
 				version: modInfo.currentVersion,
-				gameVersion: modInfo.gameVersion,
+				gameVersion: modInfo.targetVersion?.gameVersions.join(", ") || modInfo.gameVersion,
 				requires: modInfo.requires,
 				lastUpdated: currentTime,
 				auto: modInfo.auto,
@@ -500,79 +500,98 @@ async function fetchModInfo(modConfig) {
 		const html = await response.text();
 
 		const $ = cheerio.load(html);
-		const title = $(".mod-published > h2 > span").eq(1).text().replace(/\s+/gs, " ").trim();
-		const $table = $(`table[id="Connection types"]`);
+
+		// Updated title extraction for new structure:
+		// <h2><span class="assettype">...</span> / <span>QP's Chisel Tools</span></h2>
+		const title = $("h2 > span").eq(1).text().replace(/\s+/gs, " ").trim();
+
+		// Find the versions table - look for table with download buttons
+		const $table = $("table.release-table");
+
+		// Split rows into info rows and changelog rows
+		const infoRows = [];
+		const changelogRows = [];
+
+		$table.find("tbody tr").each((i, row) => {
+			const $row = $(row);
+			if ($row.attr("data-assetid")) {
+				// This is an info row
+				infoRows.push($row);
+			} else if ($row.find(".release-changelog").length > 0) {
+				// This is a changelog row
+				changelogRows.push($row);
+			}
+		});
 
 		const versions = [];
-		$table
-			.find("tbody tr")
-			.slice(0, MOST_RECENT_ENTRIES_COUNT)
-			.each((i, row) => {
-				const $row = $(row);
-				const $versionCell = $row.find("td").eq(0);
-				const $gameVersionCell = $row.find("td").eq(1);
+		const maxVersions = Math.min(MOST_RECENT_ENTRIES_COUNT, infoRows.length);
 
-				// Get version from first line of version cell and strip 'v' prefix
-				const version = $versionCell.text().trim().split("\n")[0].trim().replace(/^v/, "");
+		for (let i = 0; i < maxVersions; i++) {
+			const $infoRow = infoRows[i];
+			const $changelogRow = changelogRows[i]; // Corresponding changelog row
 
-				// Get changelog and clean up whitespace
-				const changelog = $versionCell
-					.find(".changelogtext")
-					.text()
-					.trim()
-					.split("\n")
-					.map((line) => line.trim())
-					.filter((line) => line)
-					.join("\n")
-					.replace(/-----BEGIN PGP SIGNATURE-----[\s\S]*?-----END PGP SIGNATURE-----/g, "")
-					.trim();
+			// Version is in the first column of info row
+			const version = $infoRow.find("td").eq(0).text().trim().replace(/^v/, "");
 
-				const $gameVersionTags = $gameVersionCell.find(".tag");
-				let gameVersions = [];
-				$gameVersionTags.each((i, tag) => {
-					const $tag = $(tag);
-					const title = $tag.attr("title");
-					if (title) {
-						/*
-						<td>
-							<div class="tags">
-								<a href="#" class="tag" style="background-color:#C9C9C9" title="v1.20.0, v1.20.1, v1.20.2, v1.20.3, v1.20.4">Various v1.20.x*</a>
-							</div>
-						</td>
-						*/
-						const versions = title.split(",").map((v) => v.trim().replace(/^[#v]*/, ""));
-						gameVersions.push(...versions);
-					} else {
-						/*
-						<td>
-							<div class="tags">
-								<a href="/list/mod/?gv[]=270" class="tag" style="background-color:#C9C9C9">#v1.20.4-rc.3</a>
-								<a href="/list/mod/?gv[]=271" class="tag" style="background-color:#C9C9C9">#v1.20.4-rc.4</a>
-							</div>
-						</td>
-						*/
-						gameVersions.push(
-							$tag
-								.text()
-								.trim()
-								.replace(/^[#v]*/, ""),
-						);
-					}
-				});
+			// Parse game versions from new tag structure in second column
+			const $gameVersionCell = $infoRow.find("td").eq(1);
+			let gameVersions = [];
 
-				const releaseDate = $row.find("td").eq(3).text().trim();
-
-				const downloadUrl = $row.find("td").eq(5).find("a.downloadbutton").attr("href");
-				const downloadFile = downloadUrl ? `https://mods.vintagestory.at${downloadUrl}` : null;
-
-				versions.push({
-					version,
-					gameVersions,
-					releaseDate,
-					changelog,
-					downloadFile,
-				});
+			// Check for single version links: <a href="/list/mod/?gv[]=1.20.10" class="tag" rel="tag">1.20.10</a>
+			const $versionLinks = $gameVersionCell.find("a.tag[rel='tag']");
+			$versionLinks.each((j, link) => {
+				const version = $(link).text().trim();
+				gameVersions.push(version);
 			});
+
+			// Check for version range spans: <span class="tag">1.20.6 - 1.20.7</span>
+			const $versionSpans = $gameVersionCell.find("span.tag");
+			$versionSpans.each((j, span) => {
+				const versionText = $(span).text().trim();
+				if (versionText.includes(" - ")) {
+					// Parse range like "1.20.6 - 1.20.7" and expand to all versions in range
+					const [start, end] = versionText.split(" - ").map((v) => v.trim());
+					const expandedVersions = expandVersionRange(start, end);
+					gameVersions.push(...expandedVersions);
+				} else {
+					gameVersions.push(versionText);
+				}
+			});
+
+			// Release date from 4th column
+			const releaseDate = $infoRow.find("td").eq(3).text().trim();
+
+			// Download URL from 6th column (index 5)
+			const downloadUrl = $infoRow.find("td").eq(5).find("a.mod-dl").attr("href");
+			const downloadFile = downloadUrl ? `https://mods.vintagestory.at${downloadUrl}` : null;
+
+			// Extract changelog from corresponding changelog row
+			let changelog = "";
+			if ($changelogRow && $changelogRow.length > 0) {
+				const $changelogContent = $changelogRow.find(".release-changelog");
+				if ($changelogContent.length > 0) {
+					changelog = $changelogContent
+						.text()
+						.trim()
+						// Remove the version number from the beginning (it's usually in bold)
+						.replace(new RegExp(`^${version.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*`), "")
+						.split("\n")
+						.map((line) => line.trim())
+						.filter((line) => line)
+						.join("\n")
+						.replace(/-----BEGIN PGP SIGNATURE-----[\s\S]*?-----END PGP SIGNATURE-----/g, "")
+						.trim();
+				}
+			}
+
+			versions.push({
+				version,
+				gameVersions,
+				releaseDate,
+				changelog,
+				downloadFile,
+			});
+		}
 
 		// Print first entry as example with relative time
 		if (versions.length) {
@@ -781,4 +800,24 @@ function compileChangeLog(versions, oldModVersion, newModVersion) {
 			.replace(/\n*Version \d+\.\d+\.\d+:\n/gs, "\n")
 			.trim()
 	);
+}
+
+function expandVersionRange(startVersion, endVersion) {
+	const start = splitVersion(startVersion);
+	const end = splitVersion(endVersion);
+	const versions = [];
+
+	// Only handle cases where major.minor are the same and only patch differs
+	if (start.major === end.major && start.minor === end.minor) {
+		for (let patch = start.patch; patch <= end.patch; patch++) {
+			const versionStr = `${start.major}.${start.minor}.${patch}`;
+			versions.push(versionStr);
+		}
+	} else {
+		// For more complex ranges, just include start and end for now
+		// TODO: Could implement more sophisticated range expansion if needed
+		versions.push(startVersion, endVersion);
+	}
+
+	return versions;
 }
