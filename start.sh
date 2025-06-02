@@ -8,7 +8,7 @@ cd "$(dirname "$0")"
 git fetch --prune
 git pull || true
 
-if [ -f "discord-config.json5" ]; then
+if [ -f "data/discord-config.json5" ]; then
     ./update-mods.sh
 fi
 

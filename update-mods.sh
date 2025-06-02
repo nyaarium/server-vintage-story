@@ -13,7 +13,7 @@ docker build -t $APP_NAME docker/
 sleep 1  # Give Docker time to clean up
 
 DISCORD_VOL=""
-if [ -f "discord-config.json5" ]; then
+if [ -f "data/discord-config.json5" ]; then
     DISCORD_VOL="-v $(pwd)/data/discord-config.json5:/data/discord-config.json5:ro"
 fi
 
