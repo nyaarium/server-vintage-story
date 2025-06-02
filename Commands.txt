@@ -8,7 +8,7 @@ Making a player an operator:
 /op username
 
 Allowing a person to reset their class:
-/allowcharselonce username
+/player username allowcharselonce
 
 Then they have to type:
 .charsel
