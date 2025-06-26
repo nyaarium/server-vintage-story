@@ -2,7 +2,7 @@ FROM debian:bookworm
 
 
 # Adjust the game version here
-ENV GAME_VERSION="1.20.11"
+ENV GAME_VERSION="1.20.12"
 
 
 ENV DEBIAN_FRONTEND=noninteractive
