@@ -7,7 +7,7 @@ cd "$(dirname "$0")"
 
 mkdir -p data/saves data/mods data/logs
 
-docker build -t $APP_NAME docker/
+docker build -t $APP_NAME -f docker/Dockerfile .
 
 ./stop.sh
 sleep 1  # Give Docker time to clean up

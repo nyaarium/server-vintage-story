@@ -48,7 +48,7 @@ RUN wget https://dot.net/v1/dotnet-install.sh -O dotnet-install.sh \
 ############################
 # Game server
 
-COPY install.sh /root/install.sh
+COPY docker/install.sh /root/install.sh
 RUN chmod +x /root/install.sh \
 	&& /root/install.sh \
 	&& rm /root/install.sh
@@ -57,7 +57,7 @@ RUN chmod +x /root/install.sh \
 ############################
 # Monitor server
 
-COPY monitor/ /monitor/
+COPY docker/monitor/ /monitor/
 RUN cd /monitor \
 	&& npm i express helmet moment moment-timezone
 
@@ -65,7 +65,7 @@ RUN cd /monitor \
 ############################
 # Mod updater
 
-COPY mod-updater.mjs /root/mod-updater.mjs
+COPY docker/mod-updater.mjs /root/mod-updater.mjs
 RUN cd /root \
 	&& npm i cheerio discord.js json5 moment moment-timezone node-fetch
 
@@ -73,7 +73,7 @@ RUN cd /root \
 ############################
 # Docker server
 
-COPY start-docker-server.sh /app/start-docker-server.sh
+COPY docker/start-docker-server.sh /app/start-docker-server.sh
 RUN chmod +x /app/start-docker-server.sh
 
 WORKDIR /app
