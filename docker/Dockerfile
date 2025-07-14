@@ -5,11 +5,15 @@ FROM debian:bookworm
 ENV GAME_VERSION="1.20.12"
 
 
-ENV DEBIAN_FRONTEND=noninteractive
-ENV TZ=America/Los_Angeles
+RUN apt update && apt install -y locales tzdata && apt clean -y && rm -rf /var/lib/apt/lists/* \
+    && sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen \
+    && locale-gen en_US.UTF-8 \
+    && update-locale LANG=en_US.UTF-8 \
+    && ln -fs /usr/share/zoneinfo/America/Los_Angeles /etc/localtime \
+    && echo "America/Los_Angeles" > /etc/timezone
 ENV LANGUAGE=en_US:en
-ENV LANG=en_US.UTF-8
 ENV LC_ALL=en_US.UTF-8
+
 ENV HOME=/root
 
 RUN apt update && apt install -y \
@@ -22,10 +26,6 @@ RUN apt update && apt install -y \
 	gnupg \
 	screen \
 	wget \
-	locales \
-	&& sed -i -e 's/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen \
-	&& locale-gen \
-	&& update-locale LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 \
 	&& apt autoremove --purge -y && apt clean
 
 RUN NODE_MAJOR=22 \
