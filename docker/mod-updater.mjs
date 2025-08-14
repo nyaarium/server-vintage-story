@@ -10,9 +10,10 @@ const MODS_DIR = "/data/Mods";
 const MODS_JSON_PATH = "/data/mods.json5";
 const DISCORD_CONFIG_PATH = "/data/discord-config.json5";
 
-const MOST_RECENT_ENTRIES_COUNT = 20;
-
 const CACHE_TIME_HOURS = 4;
+
+const DEBUG_PARSING = false;
+const DEBUG_VERSIONS = false;
 
 let discordClient = null;
 let discordChannels = [];
@@ -501,6 +502,23 @@ async function fetchModInfo(modConfig) {
 
 		const $ = cheerio.load(html);
 
+		// DEBUG: Basic structure check
+		if (DEBUG_PARSING) {
+			console.log("Page title:", $("title").text().trim());
+			console.log("Tables found:", $("table").length);
+
+			// Check for release table
+			const $releaseTable = $("table.release-table");
+			console.log("Release table found:", $releaseTable.length);
+
+			// Check for alternative table with downloads
+			const $downloadTable = $("table").filter((i, table) => {
+				const $table = $(table);
+				return $table.find('a[href*="download"]').length > 0;
+			});
+			console.log("Tables with downloads:", $downloadTable.length);
+		}
+
 		// Updated title extraction for new structure:
 		// <h2><span class="assettype">...</span> / <span>QP's Chisel Tools</span></h2>
 		const title = $("h2 > span").eq(1).text().replace(/\s+/gs, " ").trim();
@@ -523,10 +541,13 @@ async function fetchModInfo(modConfig) {
 			}
 		});
 
-		const versions = [];
-		const maxVersions = Math.min(MOST_RECENT_ENTRIES_COUNT, infoRows.length);
+		if (DEBUG_PARSING) {
+			console.log(`Info rows: ${infoRows.length}, Changelog rows: ${changelogRows.length}`);
+		}
 
-		for (let i = 0; i < maxVersions; i++) {
+		const versions = [];
+
+		for (let i = 0; i < infoRows.length; i++) {
 			const $infoRow = infoRows[i];
 			const $changelogRow = changelogRows[i]; // Corresponding changelog row
 
@@ -596,11 +617,23 @@ async function fetchModInfo(modConfig) {
 		// Print first entry as example with relative time
 		if (versions.length) {
 			console.log(title);
-			for (const version of versions) {
-				const gameVersionText = version.gameVersions.join(", ");
-				console.log(`(${version.releaseDate}) ${version.version} - Supports: ${gameVersionText}`);
+			if (DEBUG_VERSIONS) {
+				console.log(`\n=== DEBUG: All found versions ===`);
+				for (const version of versions) {
+					const gameVersionText = version.gameVersions.join(", ");
+					console.log(`(${version.releaseDate}) ${version.version} - Supports: ${gameVersionText}`);
+
+					// Check compatibility with current game version
+					const exactMatch = version.gameVersions.some(isVersionExactMatch);
+					const minorMatch = version.gameVersions.some(isVersionMinorMatch);
+					const belowMatch = version.gameVersions.some(isVersionBelow);
+
+					console.log(`  -> Exact match (${GAME_VERSION}): ${exactMatch}`);
+					console.log(`  -> Minor match (${GAME_VERSION}): ${minorMatch}`);
+					console.log(`  -> Below match (${GAME_VERSION}): ${belowMatch}`);
+				}
+				console.log(`\n`);
 			}
-			console.log(`\n`);
 		} else {
 			console.log(`No versions found???\n`);
 		}
@@ -731,16 +764,26 @@ function resolveBestVersions(modConfig, modInfo) {
 		return version.gameVersions.some(isVersionExactMatch);
 	});
 
+	if (DEBUG_VERSIONS) {
+		console.log(`[${modConfig.id}] Exact matches: ${compatibleVersions.length}`);
+	}
+
 	// If not, match the first version below the current version
 	if (!compatibleVersions.length) {
 		compatibleVersions = modInfo.versions.filter((version) => {
 			return version.gameVersions.some(isVersionBelow);
 		});
+		if (DEBUG_VERSIONS) {
+			console.log(`[${modConfig.id}] Below matches: ${compatibleVersions.length}`);
+		}
 	}
 
 	// If not, use anything
 	if (!compatibleVersions.length) {
 		compatibleVersions = modInfo.versions;
+		if (DEBUG_VERSIONS) {
+			console.log(`[${modConfig.id}] Using all versions (no compatible ones found)`);
+		}
 	}
 
 	// Sort by version (highest first)
