@@ -2,7 +2,7 @@ FROM debian:bookworm
 
 
 # Adjust the game version here
-ENV GAME_VERSION="1.20.12"
+ENV GAME_VERSION="1.21.0"
 
 
 RUN apt update && apt install -y locales tzdata && apt clean -y && rm -rf /var/lib/apt/lists/* \
@@ -41,8 +41,9 @@ RUN NODE_MAJOR=22 \
 
 RUN wget https://dot.net/v1/dotnet-install.sh -O dotnet-install.sh \
 	&& chmod +x dotnet-install.sh \
-	&& ./dotnet-install.sh --runtime aspnetcore --channel 7.0 \
-	&& apt autoremove --purge -y && apt clean
+	&& ./dotnet-install.sh --runtime aspnetcore --channel 8.0 \
+	&& rm dotnet-install.sh \
+	&& apt clean && rm -rf /var/lib/apt/lists/*
 
 
 ############################
