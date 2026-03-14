@@ -1,0 +1,28 @@
+{
+    startOptions: {
+        start: {
+            label: "Start Server",
+            role: "user",
+            command: ["bash", "start.sh"],
+        },
+        updateMods: {
+            label: "Update Mods",
+            role: "admin",
+            command: ["bash", "start.sh", "node mod-updater.mjs"],
+        },
+    },
+    patterns: {
+        ready: "\\[Server Event\\] Dedicated Server now running",
+        playerJoin: "\\[Server Event\\] .* joins\\.",
+        playerLeave: "\\[Server Event\\] Player .* (left|got removed)\\.",
+    },
+    logging: {
+        mode: "stdout",
+    },
+    stopAction: {
+        type: "stdin",
+        command: "/stop",
+        enterDelaySec: 60,
+        forceKillSec: 300,
+    },
+}

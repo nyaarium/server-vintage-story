@@ -55,14 +55,6 @@ RUN chmod +x /root/install.sh \
 
 
 ############################
-# Monitor server
-
-COPY docker/monitor/ /monitor/
-RUN cd /monitor \
-	&& npm i express helmet moment moment-timezone
-
-
-############################
 # Mod updater
 
 COPY docker/mod-updater.mjs /root/mod-updater.mjs
@@ -71,10 +63,10 @@ RUN cd /root \
 
 
 ############################
-# Docker server
+# Server start script
 
-COPY docker/start-docker-server.sh /app/start-docker-server.sh
-RUN chmod +x /app/start-docker-server.sh
+COPY docker/start-server.sh /app/start-server.sh
+RUN chmod +x /app/start-server.sh
 
 WORKDIR /app
-CMD ["/app/start-docker-server.sh"]
+CMD ["sleep", "infinity"]

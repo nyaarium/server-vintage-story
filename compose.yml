@@ -1,0 +1,15 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: app
+    restart: unless-stopped
+    stdin_open: true
+    volumes:
+      - ./data/saves:/data
+      - ./data/mods:/data/Mods
+      - ./data/logs:/data/logs
+      - ./data/mods.json5:/data/mods.json5
+    ports:
+      - "42420:42420/tcp"

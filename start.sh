@@ -1,18 +1,16 @@
 #!/bin/bash
 
-export APP_NAME="vintage-story"
-
 set -e
 cd "$(dirname "$0")"
 
-git fetch --prune
-git pull || true
+# Ensure data directories exist
+mkdir -p data/saves data/mods data/logs
 
-if [ -f "data/discord-config.json5" ]; then
-    ./update-mods.sh
+# Build and start container
+docker compose up -d --build
+
+if [ $# -gt 0 ]; then
+    docker exec app bash -c "cd /root && $*"
+else
+    exec docker exec -i app /app/start-server.sh
 fi
-
-export APP_SERVICE=true
-./run.sh
-
-docker logs -f --tail 0 $APP_NAME
