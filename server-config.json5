@@ -8,7 +8,12 @@
         updateMods: {
             label: "Update Mods",
             role: "admin",
-            command: ["bash", "start.sh", "node mod-updater.mjs"],
+            command: ["bash", "start.sh", "bun /root/mod-updater/cli.ts update"],
+        },
+        checkOutdated: {
+            label: "Check For Updates",
+            role: "admin",
+            command: ["bash", "start.sh", "bun /root/mod-updater/cli.ts outdated"],
         },
     },
     patterns: {
