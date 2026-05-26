@@ -3,6 +3,7 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile
+      pull: true
     container_name: app
     restart: unless-stopped
     stdin_open: true
