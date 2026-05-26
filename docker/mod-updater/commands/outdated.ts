@@ -120,7 +120,7 @@ export async function runOutdated(opts: OutdatedOptions): Promise<OutdatedSummar
 	// Always post when a valid discord-config.json5 is present, but only when
 	// there is something pending — routine below-current warnings alone (which
 	// are not part of hasChanges) never trigger a notification.
-	const notifier = new DiscordNotifier({ title: "## Vintage Story — Updates Available" });
+	const notifier = new DiscordNotifier({ title: "# Vintage Story — Updates Available" });
 	if (notifier.enabled && summary.hasChanges) {
 		for (const block of buildOutdatedBlocks(summary)) notifier.post(block);
 		await notifier.finalize();
@@ -137,19 +137,19 @@ export function buildOutdatedBlocks(summary: OutdatedSummary): string[] {
 	const tag = (kind: string) => (kind === "exact" ? "" : `  _(${kind})_`);
 
 	if (summary.wouldUpdate.length) {
-		blocks.push("## ⬆️ Updates available");
+		blocks.push("## Updates available");
 		for (const c of summary.wouldUpdate) {
 			blocks.push(`• **${c.title}** (\`${c.id}\`)  ${c.from} → ${c.to}${tag(c.matchKind)}`);
 		}
 	}
 	if (summary.wouldInstall.length) {
-		blocks.push("## ➕ Would install");
+		blocks.push("## Would install");
 		for (const c of summary.wouldInstall) {
 			blocks.push(`• ${c.title} (\`${c.id}\`)  ${c.to}${tag(c.matchKind)}`);
 		}
 	}
 	if (summary.wouldAutoRemove.length) {
-		blocks.push("## ➖ Would remove (unused deps)");
+		blocks.push("## Would remove (unused deps)");
 		for (const id of summary.wouldAutoRemove) blocks.push(`• ${id}`);
 	}
 	if (summary.wouldOrphanPrune.length) {

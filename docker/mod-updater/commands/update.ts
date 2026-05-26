@@ -33,7 +33,7 @@ export async function runUpdate(opts: UpdateOptions): Promise<RunSummary> {
 	const deps = buildDepTree(config);
 	const depIds = Object.keys(deps).sort();
 
-	const notifier = new DiscordNotifier({ title: "## Vintage Story — Mod Update" });
+	const notifier = new DiscordNotifier({ title: "# Vintage Story — Mod Update" });
 	const summary: RunSummary = {
 		installed: [],
 		updated: [],
@@ -151,7 +151,7 @@ export async function runUpdate(opts: UpdateOptions): Promise<RunSummary> {
 export function buildUpdateBlocks(summary: RunSummary): string[] {
 	const blocks: string[] = [];
 	if (summary.updated.length) {
-		blocks.push("## ✅ Updated");
+		blocks.push("## Updated");
 		for (const u of summary.updated) {
 			let block = `**${u.title}** (\`${u.id}\`)  ${u.from} → ${u.to}`;
 			if (u.changelog) {
@@ -161,13 +161,13 @@ export function buildUpdateBlocks(summary: RunSummary): string[] {
 		}
 	}
 	if (summary.installed.length) {
-		blocks.push("## ✅ Newly installed");
+		blocks.push("## Newly installed");
 		for (const i of summary.installed) {
 			blocks.push(`• ${i.title} (\`${i.id}\`)  ${i.version}`);
 		}
 	}
 	if (summary.deletedZips.length) {
-		blocks.push("## ❌ Deleted");
+		blocks.push("## 🗑️ Deleted");
 		for (const id of summary.deletedZips) {
 			blocks.push(`• ${id}`);
 		}

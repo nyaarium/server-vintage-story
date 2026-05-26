@@ -23,9 +23,9 @@ describe("buildUpdateBlocks", () => {
 			warnings: [],
 			deletedZips: ["oldmod"],
 		});
-		expect(blocks).toContain("## ✅ Updated");
-		expect(blocks).toContain("## ✅ Newly installed");
-		expect(blocks).toContain("## ❌ Deleted");
+		expect(blocks).toContain("## Updated");
+		expect(blocks).toContain("## Newly installed");
+		expect(blocks).toContain("## 🗑️ Deleted");
 		expect(blocks.some((b) => b.startsWith("• Mod A"))).toBe(true);
 		const bBlock = blocks.find((b) => b.includes("Mod B"))!;
 		expect(bBlock).toContain("1.0.0 → 1.1.0");
@@ -74,9 +74,9 @@ describe("buildOutdatedBlocks", () => {
 			warnings: [],
 			hasChanges: true,
 		});
-		expect(blocks).toContain("## ⬆️ Updates available");
-		expect(blocks).toContain("## ➕ Would install");
-		expect(blocks).toContain("## ➖ Would remove (unused deps)");
+		expect(blocks).toContain("## Updates available");
+		expect(blocks).toContain("## Would install");
+		expect(blocks).toContain("## Would remove (unused deps)");
 		expect(blocks).toContain("## 🗑️ Would delete orphan zips");
 		expect(blocks.some((b) => b.startsWith("• **Mod B**") && b.includes("1.0.0 → 1.1.0"))).toBe(true);
 		expect(blocks.some((b) => b.includes("Mod A") && b.includes("_(below)_"))).toBe(true); // matchKind tag

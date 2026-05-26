@@ -16,13 +16,13 @@ interface ChannelState {
 	failed: boolean;
 }
 
-const TITLE = "## Vintage Story Server Mod Updates";
+const TITLE = "# Vintage Story Server Mod Updates";
 
 // Discord hard-caps messages at 2000 characters. Leave headroom for safety.
 export const MAX_MESSAGE_LEN = 1900;
 
 function isHeader(block: string): boolean {
-	return block.startsWith("## ");
+	return /^#{1,6} /.test(block);
 }
 
 // Last-resort split for a single block that is itself larger than the limit
