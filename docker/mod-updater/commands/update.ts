@@ -125,15 +125,11 @@ export async function runUpdate(opts: UpdateOptions): Promise<RunSummary> {
 		log.err(reason);
 		log.warn("Aborted. Lockfile saved with partial progress; rerun to resume.");
 
-		// Notify Discord of the abort — partial progress is already persisted, so
-		// admins should know the run stopped and where.
-		notifier.post("## ⚠️ Update aborted");
-		notifier.post(`Stopped at \`${isModUpdaterError(err) && err.modId ? err.modId : "?"}\`: ${reason}`);
-		notifier.post(`Applied before abort: ${summary.updated.length} updated, ${summary.installed.length} installed`);
-		try {
-			await notifier.finalize();
-		} catch {
-			// best effort — never mask the original error
+		// The CLI's top-level handler posts the failure to Discord. Attach the
+		// partial-progress tally so that notice tells admins how far it got.
+		if (err && typeof err === "object") {
+			(err as { context?: string }).context =
+				`Aborted after ${summary.updated.length} updated, ${summary.installed.length} installed (lockfile saved; rerun to resume)`;
 		}
 		throw err;
 	}

@@ -16,6 +16,12 @@ ENV LC_ALL=en_US.UTF-8
 
 ENV HOME=/root
 
+# Put bun + dotnet on PATH for every shell (docker exec / compose run do not
+# source ~/.bashrc), so commands can be a bare `bun` / `dotnet`.
+ENV BUN_INSTALL="/root/.bun"
+ENV DOTNET_ROOT="/root/.dotnet"
+ENV PATH="/root/.bun/bin:/root/.dotnet:/root/.dotnet/tools:${PATH}"
+
 RUN apt update && apt install -y \
 	software-properties-common \
 	&& apt autoremove --purge -y && apt clean
@@ -67,7 +73,7 @@ RUN chmod +x /root/install.sh \
 # Mod updater
 
 COPY docker/mod-updater/package.json docker/mod-updater/bun.lock /root/mod-updater/
-RUN cd /root/mod-updater && /root/.bun/bin/bun install --production --frozen-lockfile
+RUN cd /root/mod-updater && bun install --production --frozen-lockfile
 COPY docker/mod-updater/ /root/mod-updater/
 
 

@@ -1,17 +1,41 @@
+# Both services run the same image and the same build. The anchor keeps them
+# identical so either service can build `vintage-story-app` on its own; the
+# updater is not parasitic on the app service having been built first.
+x-build: &app-build
+  context: .
+  dockerfile: docker/Dockerfile
+  pull: true
+
 services:
+  # The game server. Long-lived and network-facing. Deliberately mounts NO
+  # mod-updater configs, so the Discord secret in host-configs is never exposed
+  # to it, and no config mount points get created inside ./data/saves.
   app:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile
-      pull: true
+    build: *app-build
+    image: vintage-story-app
     container_name: app
     restart: unless-stopped
     stdin_open: true
     volumes:
-      - ./data/host-configs:/data/host-configs
-      - ./data/mod-configs:/data/mod-configs
       - ./data/saves:/data
       - ./data/mods:/data/Mods
       - ./data/logs:/data/Logs
     ports:
       - "42420:42420/tcp"
+
+  # The mod updater. Ephemeral, run via `docker compose run --rm mod-updater ...`.
+  # Has its own build so a cold `compose run` builds the image without app.
+  # profiles keeps it from starting on `up`. CMD has no entrypoint so subcommands
+  # stay overridable (outdated, update, add). The default CMD intentionally has NO
+  # subcommand: a bare run prints usage and exits non-zero. The real command is
+  # always supplied by the orchestrator (server-config.json5 then start.sh).
+  mod-updater:
+    build: *app-build
+    image: vintage-story-app
+    profiles: ["tools"]
+    working_dir: /root/mod-updater
+    volumes:
+      - ./data/mods:/data/Mods
+      - ./data/mod-configs:/mod-configs
+      - ./data/host-configs:/host-configs
+    command: ["bun", "cli.ts"]

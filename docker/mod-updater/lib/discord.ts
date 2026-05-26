@@ -55,7 +55,7 @@ function splitOversized(block: string, limit: number): string[] {
 
 // Pack atomic blocks (section headers + individual entries) into messages no
 // larger than `limit`, cutting only at block boundaries. A header is never left
-// stranded as the last line of a message — if its following entry wouldn't also
+// stranded as the last line of a message - if its following entry wouldn't also
 // fit, the header starts a fresh message instead.
 export function packBlocks(blocks: string[], limit: number = MAX_MESSAGE_LEN): string[] {
 	const messages: string[] = [];
@@ -81,7 +81,6 @@ export function packBlocks(blocks: string[], limit: number = MAX_MESSAGE_LEN): s
 			continue;
 		}
 
-		// Would this block overflow the current message?
 		if (cur.length + 1 + block.length > limit) {
 			flush();
 			cur = block;
@@ -111,6 +110,12 @@ export interface DiscordNotifierOptions {
 	configPath?: string;
 }
 
+// Generic error notice used by the CLI's top-level handler so any command's
+// failure reaches Discord, not just stdout/stderr.
+export function buildErrorBlocks(command: string, reason: string): string[] {
+	return ["## ⚠️ Error", `\`${command || "(no command)"}\` failed:\n${reason}`];
+}
+
 export class DiscordNotifier {
 	private config: DiscordConfig | null = null;
 	private queue: string[] = [];
@@ -130,10 +135,10 @@ export class DiscordNotifier {
 			) {
 				this.config = cfg as DiscordConfig;
 			} else {
-				log.warn("[discord] Config present but missing secretKey or broadcastChannels — notifier disabled.");
+				log.warn("[discord] Config present but missing secretKey or broadcastChannels - notifier disabled.");
 			}
 		} catch (err) {
-			log.warn(`[discord] Failed to parse ${configPath}: ${(err as Error).message} — notifier disabled.`);
+			log.warn(`[discord] Failed to parse ${configPath}: ${(err as Error).message} - notifier disabled.`);
 		}
 	}
 
@@ -163,7 +168,7 @@ export class DiscordNotifier {
 
 			const channels = await this.fetchChannels(client);
 			if (channels.length === 0) {
-				log.warn("[discord] No usable channels — discarding queued messages.");
+				log.warn("[discord] No usable channels - discarding queued messages.");
 				return;
 			}
 
@@ -199,7 +204,7 @@ export class DiscordNotifier {
 				const guild = await client.guilds.fetch(ref.guildId);
 				const channel = await guild.channels.fetch(ref.channelId);
 				if (!channel || typeof (channel as any).isTextBased !== "function" || !(channel as any).isTextBased()) {
-					log.warn(`[discord] Channel ${ref.channelId} is not a text channel — skipping.`);
+					log.warn(`[discord] Channel ${ref.channelId} is not a text channel - skipping.`);
 					continue;
 				}
 				states.push({ guildId: ref.guildId, channelId: ref.channelId, channel, failed: false });

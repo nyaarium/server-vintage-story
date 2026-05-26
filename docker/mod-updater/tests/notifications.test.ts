@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { buildOutdatedBlocks } from "../commands/outdated";
 import { buildUpdateBlocks } from "../commands/update";
-import { MAX_MESSAGE_LEN, packBlocks } from "../lib/discord";
+import { buildErrorBlocks, MAX_MESSAGE_LEN, packBlocks } from "../lib/discord";
 
 type Kind = "exact" | "below" | "any" | "pinned";
 const change = (id: string, title: string, from: string | null, to: string, matchKind: Kind = "exact") => ({
@@ -57,7 +57,7 @@ describe("buildUpdateBlocks", () => {
 			warnings: [],
 			deletedZips: [],
 		});
-		const msgs = packBlocks(["## Vintage Story — Mod Update", ...blocks]);
+		const msgs = packBlocks(["## Vintage Story - Mod Update", ...blocks]);
 		for (const m of msgs) expect(m.length).toBeLessThanOrEqual(MAX_MESSAGE_LEN);
 		for (let i = 0; i < 200; i++) expect(msgs.join("\n")).toContain(`Mod ${i}`);
 	});
@@ -115,8 +115,28 @@ describe("buildOutdatedBlocks", () => {
 			warnings: [],
 			hasChanges: true,
 		});
-		const msgs = packBlocks(["## Vintage Story — Updates Available", ...blocks]);
+		const msgs = packBlocks(["## Vintage Story - Updates Available", ...blocks]);
 		for (const m of msgs) expect(m.length).toBeLessThanOrEqual(MAX_MESSAGE_LEN);
 		for (let i = 0; i < 200; i++) expect(msgs.join("\n")).toContain(`Mod ${i}`);
+	});
+});
+
+describe("buildErrorBlocks", () => {
+	test("header + command + reason", () => {
+		const blocks = buildErrorBlocks("update", "NetworkError [xlib]: 404 Not Found");
+		expect(blocks[0]).toBe("## ⚠️ Error");
+		expect(blocks[1]).toContain("`update` failed:");
+		expect(blocks[1]).toContain("404 Not Found");
+	});
+
+	test("labels a missing command", () => {
+		const blocks = buildErrorBlocks("", "boom");
+		expect(blocks[1]).toContain("(no command)");
+	});
+
+	test("packs a huge reason within the Discord limit", () => {
+		const blocks = buildErrorBlocks("update", "x".repeat(5000));
+		const msgs = packBlocks(["# Vintage Story - Mod Updater Error", ...blocks]);
+		for (const m of msgs) expect(m.length).toBeLessThanOrEqual(MAX_MESSAGE_LEN);
 	});
 });

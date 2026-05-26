@@ -5,6 +5,7 @@ import { runMigrate } from "./commands/migrate";
 import { runOutdated } from "./commands/outdated";
 import { runRemove } from "./commands/remove";
 import { runUpdate } from "./commands/update";
+import { DiscordNotifier, buildErrorBlocks } from "./lib/discord";
 import { isModUpdaterError } from "./lib/errors";
 import { log } from "./lib/logger";
 
@@ -101,12 +102,26 @@ async function main(): Promise<void> {
 	}
 }
 
-main().catch((err) => {
-	if (isModUpdaterError(err)) {
-		const prefix = err.modId ? `[${err.modId}] ` : "";
-		log.err(`${err.name}: ${prefix}${err.message}`);
-		process.exit(1);
+main().catch(async (err) => {
+	const reason = isModUpdaterError(err)
+		? `${err.name}${err.modId ? ` [${err.modId}]` : ""}: ${err.message}`
+		: err instanceof Error
+			? err.message
+			: String(err);
+	log.err(reason);
+	if (!isModUpdaterError(err)) console.error(err); // full stack to stderr for unexpected errors
+
+	// Any command failure also goes to Discord. `context` carries extra detail a
+	// command may attach (e.g. update's partial-progress tally).
+	const context = (err as { context?: string })?.context;
+	const detail = context ? `${reason}\n${context}` : reason;
+	const command = process.argv.slice(2).join(" ");
+	try {
+		const notifier = new DiscordNotifier({ title: "# Vintage Story - Mod Updater Error" });
+		for (const block of buildErrorBlocks(command, detail)) notifier.post(block);
+		await notifier.finalize();
+	} catch {
+		// best effort: a notification failure must not mask the original error
 	}
-	console.error(err);
 	process.exit(1);
 });

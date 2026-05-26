@@ -3,17 +3,17 @@
         start: {
             label: "Start Server",
             role: "user",
-            command: ["bash", "start.sh"],
+            command: ["bash", "start.sh", "game"],
         },
         updateMods: {
             label: "Update Mods",
             role: "admin",
-            command: ["bash", "start.sh", "bun /root/mod-updater/cli.ts update"],
+            command: ["bash", "start.sh", "mod-updater", "update"],
         },
         checkOutdated: {
             label: "Check For Updates",
             role: "admin",
-            command: ["bash", "start.sh", "bun /root/mod-updater/cli.ts outdated"],
+            command: ["bash", "start.sh", "mod-updater", "outdated"],
         },
     },
     patterns: {

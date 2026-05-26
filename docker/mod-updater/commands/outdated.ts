@@ -117,11 +117,12 @@ export async function runOutdated(opts: OutdatedOptions): Promise<OutdatedSummar
 
 	printReport(summary, opts.gameVersion);
 
-	// Always post when a valid discord-config.json5 is present, but only when
-	// there is something pending — routine below-current warnings alone (which
-	// are not part of hasChanges) never trigger a notification.
-	const notifier = new DiscordNotifier({ title: "# Vintage Story — Updates Available" });
-	if (notifier.enabled && summary.hasChanges) {
+	// Post when a valid discord-config.json5 is present and there is something
+	// worth reporting: pending changes, or fetch/resolve failures (errors).
+	// Routine below-current warnings alone do not trigger a notification.
+	const hasFailures = summary.warnings.some((w) => /failed/i.test(w.message));
+	const notifier = new DiscordNotifier({ title: "# Vintage Story - Updates Available" });
+	if (notifier.enabled && (summary.hasChanges || hasFailures)) {
 		for (const block of buildOutdatedBlocks(summary)) notifier.post(block);
 		await notifier.finalize();
 	}
