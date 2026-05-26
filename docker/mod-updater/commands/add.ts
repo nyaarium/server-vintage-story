@@ -25,7 +25,7 @@ export interface AddResult {
 export async function runAdd(opts: AddOptions): Promise<AddResult> {
 	const url = normalizeUrl(opts.url);
 	if (!/^https?:\/\//.test(url)) {
-		throw new ConfigError(`URL must start with http:// or https:// — got "${opts.url}"`);
+		throw new ConfigError(`URL must start with http:// or https:// - got "${opts.url}"`);
 	}
 
 	const id = modIdFromUrl(url);

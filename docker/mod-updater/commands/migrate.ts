@@ -62,7 +62,7 @@ export function runMigrate(opts: MigrateOptions): MigrateResult {
 	const oldConfig = raw as OldModsConfig;
 
 	if (!isOldFormat(oldConfig)) {
-		log.info("Config is already in new format — nothing to migrate.");
+		log.info("Config is already in new format - nothing to migrate.");
 		return { renamed: [], dropped: [], lockSeededCount: 0 };
 	}
 

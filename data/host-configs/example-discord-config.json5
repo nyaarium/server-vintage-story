@@ -6,7 +6,7 @@
 	// To use: copy this file to "discord-config.json5" (same folder) and fill in
 	// real values. Leave discord-config.json5 absent to disable notifications.
 	//
-	// NOTE: discord-config.json5 holds a secret — it is NOT committed to git.
+	// NOTE: discord-config.json5 holds a secret. It is NOT committed to git.
 	secretKey: "YOUR_BOT_TOKEN_HERE",
 
 	// One entry per channel the updater should post to. The bot must be a member

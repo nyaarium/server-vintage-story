@@ -33,7 +33,7 @@ export async function runUpdate(opts: UpdateOptions): Promise<RunSummary> {
 	const deps = buildDepTree(config);
 	const depIds = Object.keys(deps).sort();
 
-	const notifier = new DiscordNotifier({ title: "# Vintage Story — Mod Update" });
+	const notifier = new DiscordNotifier({ title: "# Vintage Story - Mod Update" });
 	const summary: RunSummary = {
 		installed: [],
 		updated: [],

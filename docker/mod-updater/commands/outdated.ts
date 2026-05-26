@@ -219,6 +219,6 @@ function printReport(summary: OutdatedSummary, gameVersion: string): void {
 	if (summary.hasChanges) {
 		log.info("Changes pending. Run `update` to apply.");
 	} else {
-		log.info("Up to date — nothing to do.");
+		log.info("Up to date - nothing to do.");
 	}
 }

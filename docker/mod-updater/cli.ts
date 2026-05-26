@@ -18,7 +18,7 @@ Commands:
   add <url>            Add a mod to config and install it
                          --lock-to <version>   Pin to a specific version
   remove <id>          Remove a mod from config; cascades unused auto-deps
-  migrate              Convert old-format mods.json5 → new config + lockfile
+  migrate              Convert old-format mods.json5 to new config + lockfile
 
 Environment:
   GAME_VERSION         Current game version (required for all commands)`;

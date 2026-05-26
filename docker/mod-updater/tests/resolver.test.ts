@@ -122,7 +122,7 @@ describe("buildDepTree", () => {
 	});
 });
 
-describe("resolveVersion — pinned", () => {
+describe("resolveVersion - pinned", () => {
 	test("pin hit returns that exact version with matchKind pinned, no warning", () => {
 		const d = dep("m", "https://example/m", { lockToVersion: "1.2.0" });
 		const p = page("M", [ver("1.3.0", ["1.22.0"]), ver("1.2.0", ["1.22.0"]), ver("1.1.0", ["1.22.0"])]);
@@ -151,7 +151,7 @@ describe("resolveVersion — pinned", () => {
 	});
 });
 
-describe("resolveVersion — fallback ladder", () => {
+describe("resolveVersion - fallback ladder", () => {
 	test("picks highest exact-matching version when exact match exists", () => {
 		const d = dep("m", "https://example/m");
 		const p = page("M", [

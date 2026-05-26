@@ -21,7 +21,7 @@ export async function runRemove(opts: RemoveOptions): Promise<RemoveResult> {
 	const config = readConfig();
 	if (!config[opts.id]) {
 		throw new ConfigError(
-			`Mod "${opts.id}" is not in config. (Auto-installed dependencies cannot be removed directly — remove their parent mod instead.)`,
+			`Mod "${opts.id}" is not in config. (Auto-installed dependencies cannot be removed directly - remove their parent mod instead.)`,
 		);
 	}
 

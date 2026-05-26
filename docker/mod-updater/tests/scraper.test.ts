@@ -9,7 +9,7 @@ function loadFixture(name: string): string {
 	return fs.readFileSync(path.join(FIXTURE_DIR, name), "utf8");
 }
 
-describe("parseModPage — butchering.html fixture", () => {
+describe("parseModPage - butchering.html fixture", () => {
 	const html = loadFixture("butchering.html");
 	const page = parseModPage(html, "https://mods.vintagestory.at/show/mod/7966");
 
@@ -60,7 +60,7 @@ describe("parseModPage — butchering.html fixture", () => {
 	});
 });
 
-describe("parseModPage — error paths", () => {
+describe("parseModPage - error paths", () => {
 	test("throws ScraperError when title is missing", () => {
 		expect(() => parseModPage("<html><body>no title here</body></html>", "about:blank")).toThrow(/title/i);
 	});
@@ -81,7 +81,7 @@ describe("parseModPage — error paths", () => {
 	});
 });
 
-describe("parseModPage — version range expansion from span.tag", () => {
+describe("parseModPage - version range expansion from span.tag", () => {
 	test("expands a same-minor patch range into individual versions", () => {
 		const html = `
 			<html><body>
@@ -129,7 +129,7 @@ describe("parseModPage — version range expansion from span.tag", () => {
 	});
 });
 
-describe("parseModPage — changelog extraction", () => {
+describe("parseModPage - changelog extraction", () => {
 	test("strips PGP signature blocks", () => {
 		const html = `
 			<html><body>
