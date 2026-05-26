@@ -7,9 +7,10 @@ services:
     restart: unless-stopped
     stdin_open: true
     volumes:
+      - ./data/host-configs:/data/host-configs
+      - ./data/mod-configs:/data/mod-configs
       - ./data/saves:/data
       - ./data/mods:/data/Mods
-      - ./data/logs:/data/logs
-      - ./data/mods.json5:/data/mods.json5
+      - ./data/logs:/data/Logs
     ports:
       - "42420:42420/tcp"

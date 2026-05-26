@@ -4,7 +4,7 @@ set -e
 cd "$(dirname "$0")"
 
 # Ensure data directories exist
-mkdir -p data/saves data/mods data/logs
+mkdir -p data/saves data/mods data/logs data/mod-configs data/host-configs
 
 # Build and start container
 docker compose up -d --build

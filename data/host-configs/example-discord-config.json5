@@ -1,0 +1,22 @@
+{
+	// Discord bot token used by the mod updater to post update summaries.
+	// Create an application + bot at https://discord.com/developers/applications,
+	// then copy the bot's token here.
+	//
+	// To use: copy this file to "discord-config.json5" (same folder) and fill in
+	// real values. Leave discord-config.json5 absent to disable notifications.
+	//
+	// NOTE: discord-config.json5 holds a secret — it is NOT committed to git.
+	secretKey: "YOUR_BOT_TOKEN_HERE",
+
+	// One entry per channel the updater should post to. The bot must be a member
+	// of each guild and have permission to send messages in each channel.
+	// IDs are obtained by enabling Developer Mode in Discord, then right-clicking
+	// a server / channel -> "Copy Server ID" / "Copy Channel ID".
+	broadcastChannels: [
+		{
+			guildId: "000000000000000000",
+			channelId: "000000000000000000",
+		},
+	],
+}
