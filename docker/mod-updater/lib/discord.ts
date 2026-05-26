@@ -18,6 +18,94 @@ interface ChannelState {
 
 const TITLE = "## Vintage Story Server Mod Updates";
 
+// Discord hard-caps messages at 2000 characters. Leave headroom for safety.
+export const MAX_MESSAGE_LEN = 1900;
+
+function isHeader(block: string): boolean {
+	return block.startsWith("## ");
+}
+
+// Last-resort split for a single block that is itself larger than the limit
+// (e.g. a mod with an enormous changelog). Split on line boundaries first,
+// hard-cutting only an individual line that still overflows.
+function splitOversized(block: string, limit: number): string[] {
+	const pieces: string[] = [];
+	let cur = "";
+	for (const line of block.split("\n")) {
+		if (line.length > limit) {
+			if (cur) {
+				pieces.push(cur);
+				cur = "";
+			}
+			for (let i = 0; i < line.length; i += limit) {
+				pieces.push(line.slice(i, i + limit));
+			}
+			continue;
+		}
+		if (cur && cur.length + 1 + line.length > limit) {
+			pieces.push(cur);
+			cur = line;
+		} else {
+			cur = cur ? `${cur}\n${line}` : line;
+		}
+	}
+	if (cur) pieces.push(cur);
+	return pieces;
+}
+
+// Pack atomic blocks (section headers + individual entries) into messages no
+// larger than `limit`, cutting only at block boundaries. A header is never left
+// stranded as the last line of a message — if its following entry wouldn't also
+// fit, the header starts a fresh message instead.
+export function packBlocks(blocks: string[], limit: number = MAX_MESSAGE_LEN): string[] {
+	const messages: string[] = [];
+	let cur = "";
+	const flush = () => {
+		if (cur) {
+			messages.push(cur);
+			cur = "";
+		}
+	};
+
+	for (let i = 0; i < blocks.length; i++) {
+		const block = blocks[i];
+
+		if (block.length > limit) {
+			flush();
+			for (const piece of splitOversized(block, limit)) messages.push(piece);
+			continue;
+		}
+
+		if (!cur) {
+			cur = block;
+			continue;
+		}
+
+		// Would this block overflow the current message?
+		if (cur.length + 1 + block.length > limit) {
+			flush();
+			cur = block;
+			continue;
+		}
+
+		// Header fits, but don't strand it: if its first entry won't also fit,
+		// push the header to the next message so it leads its section.
+		if (isHeader(block)) {
+			const next = blocks[i + 1];
+			const nextLen = next && next.length <= limit ? 1 + next.length : 0;
+			if (cur.length + 1 + block.length + nextLen > limit) {
+				flush();
+				cur = block;
+				continue;
+			}
+		}
+
+		cur = `${cur}\n${block}`;
+	}
+	flush();
+	return messages;
+}
+
 export class DiscordNotifier {
 	private config: DiscordConfig | null = null;
 	private queue: string[] = [];
@@ -71,9 +159,8 @@ export class DiscordNotifier {
 				return;
 			}
 
-			await this.broadcast(channels, TITLE);
-
-			for (const msg of this.queue) {
+			const messages = packBlocks([TITLE, ...this.queue]);
+			for (const msg of messages) {
 				await this.broadcast(channels, msg);
 			}
 			this.queue = [];

@@ -131,25 +131,31 @@ export async function runUpdate(opts: UpdateOptions): Promise<RunSummary> {
 	return summary;
 }
 
+// Emits one atomic block per unit so the notifier can pack/split cleanly at
+// section and entry boundaries. Bullets use "• " (not markdown "- ") because a
+// "- " list loses its formatting when a chunk boundary falls mid-list.
 function queueDiscordMessages(notifier: DiscordNotifier, summary: RunSummary): void {
 	if (summary.updated.length) {
-		notifier.post("✅ **Updated:**");
+		notifier.post("## ✅ Updated");
 		for (const u of summary.updated) {
-			let msg = `**${u.title}**  (\`${u.id}\`)  **${u.from}**  ->  **${u.to}**\n`;
+			let block = `**${u.title}** (\`${u.id}\`)  ${u.from} → ${u.to}`;
 			if (u.changelog) {
-				msg += "> " + u.changelog.replace(/\n/gs, "\n> ") + "\n";
+				block += "\n" + u.changelog.split("\n").map((line) => `> ${line}`).join("\n");
 			}
-			notifier.post(msg);
+			notifier.post(block);
 		}
 	}
 	if (summary.installed.length) {
-		notifier.post(
-			"\n**✅ Newly installed:**\n- " +
-				summary.installed.map((i) => `${i.title} (${i.id})  ${i.version}`).join("\n- "),
-		);
+		notifier.post("## ✅ Newly installed");
+		for (const i of summary.installed) {
+			notifier.post(`• ${i.title} (\`${i.id}\`)  ${i.version}`);
+		}
 	}
 	if (summary.deletedZips.length) {
-		notifier.post("\n**❌ Deleted:**\n- " + summary.deletedZips.join("\n- "));
+		notifier.post("## ❌ Deleted");
+		for (const id of summary.deletedZips) {
+			notifier.post(`• ${id}`);
+		}
 	}
 }
 
