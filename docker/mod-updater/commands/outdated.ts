@@ -1,4 +1,5 @@
 import { readConfig } from "../lib/config";
+import { DiscordNotifier } from "../lib/discord";
 import { isModUpdaterError } from "../lib/errors";
 import { listExistingZipIds, sleep } from "../lib/downloader";
 import { readLockfile } from "../lib/lockfile";
@@ -115,7 +116,60 @@ export async function runOutdated(opts: OutdatedOptions): Promise<OutdatedSummar
 		summary.wouldOrphanPrune.length > 0;
 
 	printReport(summary, opts.gameVersion);
+
+	// Always post when a valid discord-config.json5 is present, but only when
+	// there is something pending — routine below-current warnings alone (which
+	// are not part of hasChanges) never trigger a notification.
+	const notifier = new DiscordNotifier({ title: "## Vintage Story — Updates Available" });
+	if (notifier.enabled && summary.hasChanges) {
+		for (const block of buildOutdatedBlocks(summary)) notifier.post(block);
+		await notifier.finalize();
+	}
+
 	return summary;
+}
+
+// Builds atomic blocks (section headers + one bullet per entry) for the
+// "updates available" preview. Bullets use "• " so a list split across messages
+// keeps its formatting. matchKind is tagged when not an exact game-version match.
+export function buildOutdatedBlocks(summary: OutdatedSummary): string[] {
+	const blocks: string[] = [];
+	const tag = (kind: string) => (kind === "exact" ? "" : `  _(${kind})_`);
+
+	if (summary.wouldUpdate.length) {
+		blocks.push("## ⬆️ Updates available");
+		for (const c of summary.wouldUpdate) {
+			blocks.push(`• **${c.title}** (\`${c.id}\`)  ${c.from} → ${c.to}${tag(c.matchKind)}`);
+		}
+	}
+	if (summary.wouldInstall.length) {
+		blocks.push("## ➕ Would install");
+		for (const c of summary.wouldInstall) {
+			blocks.push(`• ${c.title} (\`${c.id}\`)  ${c.to}${tag(c.matchKind)}`);
+		}
+	}
+	if (summary.wouldAutoRemove.length) {
+		blocks.push("## ➖ Would remove (unused deps)");
+		for (const id of summary.wouldAutoRemove) blocks.push(`• ${id}`);
+	}
+	if (summary.wouldOrphanPrune.length) {
+		blocks.push("## 🗑️ Would delete orphan zips");
+		for (const id of summary.wouldOrphanPrune) blocks.push(`• ${id}.zip`);
+	}
+
+	// Surface fetch/resolve failures explicitly (actionable); collapse the
+	// routine "below-current fallback" warnings into a single count line.
+	const failures = summary.warnings.filter((w) => /failed/i.test(w.message));
+	const belowCount = summary.warnings.length - failures.length;
+	if (failures.length) {
+		blocks.push("## ⚠️ Failed to check");
+		for (const w of failures) blocks.push(`• ${w.id}: ${w.message}`);
+	}
+	if (belowCount > 0) {
+		blocks.push(`_${belowCount} mod(s) on below-current fallback_`);
+	}
+
+	return blocks;
 }
 
 function printReport(summary: OutdatedSummary, gameVersion: string): void {

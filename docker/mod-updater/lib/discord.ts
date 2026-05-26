@@ -106,11 +106,19 @@ export function packBlocks(blocks: string[], limit: number = MAX_MESSAGE_LEN): s
 	return messages;
 }
 
+export interface DiscordNotifierOptions {
+	title?: string;
+	configPath?: string;
+}
+
 export class DiscordNotifier {
 	private config: DiscordConfig | null = null;
 	private queue: string[] = [];
+	private title: string;
 
-	constructor(configPath: string = DISCORD_CONFIG_PATH) {
+	constructor(opts: DiscordNotifierOptions = {}) {
+		this.title = opts.title ?? TITLE;
+		const configPath = opts.configPath ?? DISCORD_CONFIG_PATH;
 		if (!fs.existsSync(configPath)) return;
 		try {
 			const cfg = JSON5.parse(fs.readFileSync(configPath, "utf8")) as Partial<DiscordConfig>;
@@ -159,7 +167,7 @@ export class DiscordNotifier {
 				return;
 			}
 
-			const messages = packBlocks([TITLE, ...this.queue]);
+			const messages = packBlocks([this.title, ...this.queue]);
 			for (const msg of messages) {
 				await this.broadcast(channels, msg);
 			}

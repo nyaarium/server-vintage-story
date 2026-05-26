@@ -33,7 +33,7 @@ export async function runUpdate(opts: UpdateOptions): Promise<RunSummary> {
 	const deps = buildDepTree(config);
 	const depIds = Object.keys(deps).sort();
 
-	const notifier = new DiscordNotifier();
+	const notifier = new DiscordNotifier({ title: "## Vintage Story — Mod Update" });
 	const summary: RunSummary = {
 		installed: [],
 		updated: [],
@@ -119,44 +119,60 @@ export async function runUpdate(opts: UpdateOptions): Promise<RunSummary> {
 		const pruned = pruneOrphans(keepIds);
 		summary.deletedZips = pruned.deleted;
 	} catch (err) {
-		log.err(isModUpdaterError(err) ? `${err.name}${err.modId ? ` [${err.modId}]` : ""}: ${err.message}` : String(err));
+		const reason = isModUpdaterError(err)
+			? `${err.name}${err.modId ? ` [${err.modId}]` : ""}: ${err.message}`
+			: String(err);
+		log.err(reason);
 		log.warn("Aborted. Lockfile saved with partial progress; rerun to resume.");
+
+		// Notify Discord of the abort — partial progress is already persisted, so
+		// admins should know the run stopped and where.
+		notifier.post("## ⚠️ Update aborted");
+		notifier.post(`Stopped at \`${isModUpdaterError(err) && err.modId ? err.modId : "?"}\`: ${reason}`);
+		notifier.post(`Applied before abort: ${summary.updated.length} updated, ${summary.installed.length} installed`);
+		try {
+			await notifier.finalize();
+		} catch {
+			// best effort — never mask the original error
+		}
 		throw err;
 	}
 
-	queueDiscordMessages(notifier, summary);
+	for (const block of buildUpdateBlocks(summary)) notifier.post(block);
 	await notifier.finalize();
 	printSummary(summary, opts.gameVersion, newLock);
 
 	return summary;
 }
 
-// Emits one atomic block per unit so the notifier can pack/split cleanly at
+// Builds one atomic block per unit so the notifier can pack/split cleanly at
 // section and entry boundaries. Bullets use "• " (not markdown "- ") because a
 // "- " list loses its formatting when a chunk boundary falls mid-list.
-function queueDiscordMessages(notifier: DiscordNotifier, summary: RunSummary): void {
+export function buildUpdateBlocks(summary: RunSummary): string[] {
+	const blocks: string[] = [];
 	if (summary.updated.length) {
-		notifier.post("## ✅ Updated");
+		blocks.push("## ✅ Updated");
 		for (const u of summary.updated) {
 			let block = `**${u.title}** (\`${u.id}\`)  ${u.from} → ${u.to}`;
 			if (u.changelog) {
 				block += "\n" + u.changelog.split("\n").map((line) => `> ${line}`).join("\n");
 			}
-			notifier.post(block);
+			blocks.push(block);
 		}
 	}
 	if (summary.installed.length) {
-		notifier.post("## ✅ Newly installed");
+		blocks.push("## ✅ Newly installed");
 		for (const i of summary.installed) {
-			notifier.post(`• ${i.title} (\`${i.id}\`)  ${i.version}`);
+			blocks.push(`• ${i.title} (\`${i.id}\`)  ${i.version}`);
 		}
 	}
 	if (summary.deletedZips.length) {
-		notifier.post("## ❌ Deleted");
+		blocks.push("## ❌ Deleted");
 		for (const id of summary.deletedZips) {
-			notifier.post(`• ${id}`);
+			blocks.push(`• ${id}`);
 		}
 	}
+	return blocks;
 }
 
 function printSummary(summary: RunSummary, gameVersion: string, lock: Lockfile): void {
