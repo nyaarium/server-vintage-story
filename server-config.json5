@@ -17,12 +17,13 @@
         },
     },
     patterns: {
-        ready: "\\[Server Event\\] Dedicated Server now running",
-        playerJoin: "\\[Server Event\\] .* joins\\.",
-        playerLeave: "\\[Server Event\\] Player .* (left|got removed)\\.",
+        ready: "\\[Event\\] Dedicated Server now running",
+        playerJoin: "\\[Event\\] (\\S+) .*joins\\.",
+        playerLeave: "\\[Event\\] Player (\\S+) (?:left|got removed)\\.",
     },
     logging: {
-        mode: "stdout",
+        mode: "file",
+        files: ["/root/app/data/logs/server-main.log"],
     },
     stopAction: {
         type: "stdin",
