@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { buildOutdatedBlocks } from "../commands/outdated";
-import { buildUpdateBlocks } from "../commands/update";
+import { buildOutdatedBlocks, type OutdatedSummary } from "../commands/outdated";
+import { buildUpdateBlocks, type RunSummary } from "../commands/update";
 import { buildErrorBlocks, MAX_MESSAGE_LEN, modLabel, packBlocks } from "../lib/discord";
 
 type Kind = "exact" | "below" | "any" | "pinned";
@@ -12,17 +12,43 @@ const change = (id: string, title: string, from: string | null, to: string, matc
 	matchKind,
 });
 
+// Fill every field with an empty default so each test only states what it exercises;
+// adding a summary field later does not churn every literal.
+const mkRun = (o: Partial<RunSummary> = {}): RunSummary => ({
+	installed: [],
+	reEnabled: [],
+	updated: [],
+	unchanged: [],
+	autoAdded: [],
+	autoRemoved: [],
+	warnings: [],
+	deletedZips: [],
+	newlyDisabled: [],
+	...o,
+});
+
+const mkOutdated = (o: Partial<OutdatedSummary> = {}): OutdatedSummary => ({
+	wouldInstall: [],
+	wouldReEnable: [],
+	wouldUpdate: [],
+	unchanged: [],
+	wouldAutoRemove: [],
+	wouldDisable: [],
+	wouldOrphanPrune: [],
+	warnings: [],
+	hasChanges: false,
+	...o,
+});
+
 describe("buildUpdateBlocks", () => {
 	test("emits headers + bullets for updated / installed / deleted", () => {
-		const blocks = buildUpdateBlocks({
-			installed: [{ id: "a", title: "Mod A", version: "1.0.0" }],
-			updated: [{ id: "b", title: "Mod B", from: "1.0.0", to: "1.1.0", changelog: "Fixed stuff" }],
-			unchanged: [],
-			autoAdded: [],
-			autoRemoved: [],
-			warnings: [],
-			deletedZips: ["oldmod"],
-		});
+		const blocks = buildUpdateBlocks(
+			mkRun({
+				installed: [{ id: "a", title: "Mod A", version: "1.0.0" }],
+				updated: [{ id: "b", title: "Mod B", from: "1.0.0", to: "1.1.0", changelog: "Fixed stuff" }],
+				deletedZips: ["oldmod"],
+			}),
+		);
 		expect(blocks).toContain("## Updated");
 		expect(blocks).toContain("## Newly installed");
 		expect(blocks).toContain("## 🗑️ Deleted");
@@ -33,30 +59,26 @@ describe("buildUpdateBlocks", () => {
 		expect(blocks.every((b) => !b.startsWith("- "))).toBe(true); // never markdown "- "
 	});
 
+	test("emits re-enabled and disabled sections", () => {
+		const blocks = buildUpdateBlocks(
+			mkRun({
+				reEnabled: [{ id: "realsmoke", title: "Real Smoke", version: "1.2.1" }],
+				newlyDisabled: [{ id: "smithingplus", title: "Smithing Plus", version: "1.9.0-rc.1" }],
+			}),
+		);
+		expect(blocks).toContain("## Re-enabled (newer version)");
+		expect(blocks.some((b) => b.startsWith("• Real Smoke") && b.includes("1.2.1"))).toBe(true);
+		expect(blocks).toContain("## 🗑️ Disabled");
+		expect(blocks.some((b) => b.startsWith("• Smithing Plus") && b.includes("disabled at 1.9.0-rc.1"))).toBe(true);
+	});
+
 	test("omits empty sections (silent summary)", () => {
-		const blocks = buildUpdateBlocks({
-			installed: [],
-			updated: [],
-			unchanged: [],
-			autoAdded: [],
-			autoRemoved: [],
-			warnings: [],
-			deletedZips: [],
-		});
-		expect(blocks).toEqual([]);
+		expect(buildUpdateBlocks(mkRun())).toEqual([]);
 	});
 
 	test("packs within Discord limit at 200-install scale", () => {
 		const installed = Array.from({ length: 200 }, (_v, i) => ({ id: `m${i}`, title: `Mod ${i}`, version: "1.0.0" }));
-		const blocks = buildUpdateBlocks({
-			installed,
-			updated: [],
-			unchanged: [],
-			autoAdded: [],
-			autoRemoved: [],
-			warnings: [],
-			deletedZips: [],
-		});
+		const blocks = buildUpdateBlocks(mkRun({ installed }));
 		const msgs = packBlocks(["## Vintage Story - Mod Update", ...blocks]);
 		for (const m of msgs) expect(m.length).toBeLessThanOrEqual(MAX_MESSAGE_LEN);
 		for (let i = 0; i < 200; i++) expect(msgs.join("\n")).toContain(`Mod ${i}`);
@@ -65,15 +87,15 @@ describe("buildUpdateBlocks", () => {
 
 describe("buildOutdatedBlocks", () => {
 	test("emits update / install / remove / orphan sections with • bullets", () => {
-		const blocks = buildOutdatedBlocks({
-			wouldUpdate: [change("b", "Mod B", "1.0.0", "1.1.0")],
-			wouldInstall: [change("a", "Mod A", null, "2.0.0", "below")],
-			unchanged: [],
-			wouldAutoRemove: ["deadlib"],
-			wouldOrphanPrune: ["orphan"],
-			warnings: [],
-			hasChanges: true,
-		});
+		const blocks = buildOutdatedBlocks(
+			mkOutdated({
+				wouldUpdate: [change("b", "Mod B", "1.0.0", "1.1.0")],
+				wouldInstall: [change("a", "Mod A", null, "2.0.0", "below")],
+				wouldAutoRemove: ["deadlib"],
+				wouldOrphanPrune: ["orphan"],
+				hasChanges: true,
+			}),
+		);
 		expect(blocks).toContain("## Updates available");
 		expect(blocks).toContain("## Would install");
 		expect(blocks).toContain("## Would remove (unused deps)");
@@ -84,20 +106,32 @@ describe("buildOutdatedBlocks", () => {
 		expect(blocks.every((b) => !b.startsWith("- "))).toBe(true);
 	});
 
+	test("emits would-re-enable and would-disable sections", () => {
+		const blocks = buildOutdatedBlocks(
+			mkOutdated({
+				wouldReEnable: [change("realsmoke", "Real Smoke", null, "1.2.1")],
+				wouldDisable: [{ id: "smithingplus", title: "Smithing Plus", version: "1.9.0-rc.1" }],
+				hasChanges: true,
+			}),
+		);
+		expect(blocks).toContain("## Would re-enable (newer version)");
+		expect(blocks.some((b) => b.startsWith("• Real Smoke") && b.includes("1.2.1"))).toBe(true);
+		expect(blocks).toContain("## 🗑️ Would disable");
+		expect(blocks.some((b) => b.startsWith("• Smithing Plus") && b.includes("disabled at 1.9.0-rc.1"))).toBe(true);
+	});
+
 	test("surfaces fetch failures, collapses below-current into a count", () => {
-		const blocks = buildOutdatedBlocks({
-			wouldUpdate: [change("b", "Mod B", "1.0.0", "1.1.0")],
-			wouldInstall: [],
-			unchanged: [],
-			wouldAutoRemove: [],
-			wouldOrphanPrune: [],
-			warnings: [
-				{ id: "x", message: "fetch/resolve failed: NetworkError: 404 Not Found" },
-				{ id: "y", message: "No 1.22.0 version available; using best-below-current" },
-				{ id: "z", message: "No 1.22.0 version available; using best-below-current" },
-			],
-			hasChanges: true,
-		});
+		const blocks = buildOutdatedBlocks(
+			mkOutdated({
+				wouldUpdate: [change("b", "Mod B", "1.0.0", "1.1.0")],
+				warnings: [
+					{ id: "x", message: "fetch/resolve failed: NetworkError: 404 Not Found" },
+					{ id: "y", message: "No 1.22.0 version available; using best-below-current" },
+					{ id: "z", message: "No 1.22.0 version available; using best-below-current" },
+				],
+				hasChanges: true,
+			}),
+		);
 		expect(blocks).toContain("## ⚠️ Failed to check");
 		expect(blocks.some((b) => b.startsWith("• x:") && b.includes("404"))).toBe(true);
 		expect(blocks.some((b) => b.includes("2 mod(s) on below-current fallback"))).toBe(true);
@@ -106,15 +140,7 @@ describe("buildOutdatedBlocks", () => {
 
 	test("packs within Discord limit at 200-install scale", () => {
 		const wouldInstall = Array.from({ length: 200 }, (_v, i) => change(`m${i}`, `Mod ${i}`, null, "1.0.0"));
-		const blocks = buildOutdatedBlocks({
-			wouldUpdate: [],
-			wouldInstall,
-			unchanged: [],
-			wouldAutoRemove: [],
-			wouldOrphanPrune: [],
-			warnings: [],
-			hasChanges: true,
-		});
+		const blocks = buildOutdatedBlocks(mkOutdated({ wouldInstall, hasChanges: true }));
 		const msgs = packBlocks(["## Vintage Story - Updates Available", ...blocks]);
 		for (const m of msgs) expect(m.length).toBeLessThanOrEqual(MAX_MESSAGE_LEN);
 		for (let i = 0; i < 200; i++) expect(msgs.join("\n")).toContain(`Mod ${i}`);
@@ -151,18 +177,7 @@ describe("modLabel + title resolution", () => {
 	test("buildUpdateBlocks Deleted uses display names via titleOf", () => {
 		const titleOf = (id: string) =>
 			({ "34183": "XSkills Catchable FotSA Patch", casuariidae: "Fauna of the Stone Age: Casuariidae Plus" })[id];
-		const blocks = buildUpdateBlocks(
-			{
-				installed: [],
-				updated: [],
-				unchanged: [],
-				autoAdded: [],
-				autoRemoved: [],
-				warnings: [],
-				deletedZips: ["casuariidae", "34183", "trueorphan"],
-			},
-			titleOf,
-		);
+		const blocks = buildUpdateBlocks(mkRun({ deletedZips: ["casuariidae", "34183", "trueorphan"] }), titleOf);
 		expect(blocks).toContain("• XSkills Catchable FotSA Patch (`34183`)");
 		expect(blocks).toContain("• Fauna of the Stone Age: Casuariidae Plus (`casuariidae`)");
 		expect(blocks).toContain("• trueorphan"); // no title -> bare id
@@ -171,15 +186,7 @@ describe("modLabel + title resolution", () => {
 	test("buildOutdatedBlocks remove/orphan sections use titles, true orphan keeps .zip", () => {
 		const titleOf = (id: string) => (id === "deadlib" ? "Some Dead Lib" : undefined);
 		const blocks = buildOutdatedBlocks(
-			{
-				wouldUpdate: [],
-				wouldInstall: [],
-				unchanged: [],
-				wouldAutoRemove: ["deadlib"],
-				wouldOrphanPrune: ["leftover"],
-				warnings: [],
-				hasChanges: true,
-			},
+			mkOutdated({ wouldAutoRemove: ["deadlib"], wouldOrphanPrune: ["leftover"], hasChanges: true }),
 			titleOf,
 		);
 		expect(blocks).toContain("• Some Dead Lib (`deadlib`)");

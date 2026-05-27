@@ -22,9 +22,11 @@ export interface PlannedChange {
 
 export interface OutdatedSummary {
 	wouldInstall: PlannedChange[];
+	wouldReEnable: PlannedChange[];
 	wouldUpdate: PlannedChange[];
 	unchanged: string[];
 	wouldAutoRemove: string[];
+	wouldDisable: Array<{ id: string; title: string; version: string }>;
 	wouldOrphanPrune: string[];
 	warnings: Array<{ id: string; message: string }>;
 	hasChanges: boolean;
@@ -38,9 +40,11 @@ export async function runOutdated(opts: OutdatedOptions): Promise<OutdatedSummar
 
 	const summary: OutdatedSummary = {
 		wouldInstall: [],
+		wouldReEnable: [],
 		wouldUpdate: [],
 		unchanged: [],
 		wouldAutoRemove: [],
+		wouldDisable: [],
 		wouldOrphanPrune: [],
 		warnings: [],
 		hasChanges: false,
@@ -84,17 +88,26 @@ export async function runOutdated(opts: OutdatedOptions): Promise<OutdatedSummar
 
 			if (isDisabledAtVersion(dep.disabledAtVersion, resolved.targetVersion.version)) {
 				disabledUserMods.add(id);
+				// Report only the transition: a mod still installed (tracked, or a stray zip on
+				// disk) that the next update would disable + delete. Mirrors update's gate so the
+				// preview matches the action; an already-gone disabled mod stays silent.
+				if (prior || zipExistsFor(id)) {
+					summary.wouldDisable.push({ id, title: page.title, version: dep.disabledAtVersion! });
+				}
 				continue;
 			}
 
 			if (!prior) {
-				summary.wouldInstall.push({
+				const change: PlannedChange = {
 					id,
 					title: page.title,
 					from: null,
 					to: resolved.targetVersion.version,
 					matchKind: resolved.matchKind,
-				});
+				};
+				// disabledAtVersion marker present but resolved above it: it would come back.
+				if (dep.disabledAtVersion) summary.wouldReEnable.push(change);
+				else summary.wouldInstall.push(change);
 			} else if (prior.version !== resolved.targetVersion.version) {
 				summary.wouldUpdate.push({
 					id,
@@ -143,8 +156,10 @@ export async function runOutdated(opts: OutdatedOptions): Promise<OutdatedSummar
 
 	summary.hasChanges =
 		summary.wouldInstall.length > 0 ||
+		summary.wouldReEnable.length > 0 ||
 		summary.wouldUpdate.length > 0 ||
 		summary.wouldAutoRemove.length > 0 ||
+		summary.wouldDisable.length > 0 ||
 		summary.wouldOrphanPrune.length > 0;
 
 	printReport(summary, opts.gameVersion, skipped.length, disabledUserMods.size);
@@ -178,6 +193,12 @@ export function buildOutdatedBlocks(
 			blocks.push(`• **${c.title}** (\`${c.id}\`)  ${c.from} → ${c.to}${tag(c.matchKind)}`);
 		}
 	}
+	if (summary.wouldReEnable.length) {
+		blocks.push("## Would re-enable (newer version)");
+		for (const c of summary.wouldReEnable) {
+			blocks.push(`• ${c.title} (\`${c.id}\`)  ${c.to}${tag(c.matchKind)}`);
+		}
+	}
 	if (summary.wouldInstall.length) {
 		blocks.push("## Would install");
 		for (const c of summary.wouldInstall) {
@@ -187,6 +208,12 @@ export function buildOutdatedBlocks(
 	if (summary.wouldAutoRemove.length) {
 		blocks.push("## Would remove (unused deps)");
 		for (const id of summary.wouldAutoRemove) blocks.push(`• ${modLabel(id, titleOf(id))}`);
+	}
+	if (summary.wouldDisable.length) {
+		blocks.push("## 🗑️ Would disable");
+		for (const d of summary.wouldDisable) {
+			blocks.push(`• ${d.title} (\`${d.id}\`)  disabled at ${d.version}`);
+		}
 	}
 	if (summary.wouldOrphanPrune.length) {
 		blocks.push("## 🗑️ Would delete orphan zips");
@@ -230,9 +257,19 @@ function printReport(summary: OutdatedSummary, gameVersion: string, skippedCount
 		}
 	}
 
+	if (summary.wouldReEnable.length) {
+		log.section(`Would re-enable (${summary.wouldReEnable.length}):`);
+		for (const c of summary.wouldReEnable) log.info(`  + ${c.title} (${c.id}) → ${c.to}`);
+	}
+
 	if (summary.wouldAutoRemove.length) {
 		log.section(`Would auto-remove unused deps (${summary.wouldAutoRemove.length}):`);
 		for (const id of summary.wouldAutoRemove) log.info(`  - ${id}`);
+	}
+
+	if (summary.wouldDisable.length) {
+		log.section(`Would disable (${summary.wouldDisable.length}):`);
+		for (const d of summary.wouldDisable) log.info(`  - ${d.title} (${d.id})  disabled at ${d.version}`);
 	}
 
 	if (summary.wouldOrphanPrune.length) {

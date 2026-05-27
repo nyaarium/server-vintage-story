@@ -9,14 +9,16 @@ import { buildDepTree, buildLockEntry, depsOrphanedByDisable, isDisabledAtVersio
 import { fetchModPage } from "../lib/scraper";
 import { matchesExactly, matchesMinor } from "../lib/version";
 
-interface RunSummary {
+export interface RunSummary {
 	installed: Array<{ id: string; title: string; version: string }>;
+	reEnabled: Array<{ id: string; title: string; version: string }>;
 	updated: Array<{ id: string; title: string; from: string; to: string; changelog: string }>;
 	unchanged: string[];
 	autoAdded: string[];
 	autoRemoved: string[];
 	warnings: Array<{ id: string; message: string }>;
 	deletedZips: string[];
+	newlyDisabled: Array<{ id: string; title: string; version: string }>;
 }
 
 export interface UpdateOptions {
@@ -44,12 +46,14 @@ export async function runUpdate(opts: UpdateOptions): Promise<RunSummary> {
 	const notifier = new DiscordNotifier({ title: "# Vintage Story - Mod Update" });
 	const summary: RunSummary = {
 		installed: [],
+		reEnabled: [],
 		updated: [],
 		unchanged: [],
 		autoAdded: [],
 		autoRemoved: [],
 		warnings: [],
 		deletedZips: [],
+		newlyDisabled: [],
 	};
 
 	log.section(`Resolving ${depIds.length} mods for game ${opts.gameVersion}...`);
@@ -96,14 +100,19 @@ export async function runUpdate(opts: UpdateOptions): Promise<RunSummary> {
 			}
 
 			if (isDisabledAtVersion(dep.disabledAtVersion, resolved.targetVersion.version)) {
-				// Known-bad version still current: keep this mod disabled. Delete any
-				// installed zip so the game cannot load it, drop it from the lockfile, and
-				// stay silent. It re-enables (under "Newly installed") only once a newer
-				// version resolves above disabledAtVersion.
-				if (deleteZip(id)) log.info(`  removed ${id}.zip`);
+				// Known-bad version still current: hold this mod disabled. Delete any
+				// installed zip so the game cannot load it and drop it from the lockfile.
+				// Report it only on the transition (it was tracked or a zip was actually
+				// removed), never every run, so a held mod does not spam the channel.
+				const wasTracked = !!oldLock?.mods[id];
+				const zipDeleted = deleteZip(id);
+				if (zipDeleted) log.info(`  removed ${id}.zip`);
 				removeMod(newLock, id);
 				writeLockfile(newLock);
 				disabledUserMods.add(id);
+				if (wasTracked || zipDeleted) {
+					summary.newlyDisabled.push({ id, title: page.title, version: dep.disabledAtVersion! });
+				}
 				log.info(`  ${dep.id} disabled at ${dep.disabledAtVersion} (latest ${resolved.targetVersion.version})`);
 				continue;
 			}
@@ -121,10 +130,14 @@ export async function runUpdate(opts: UpdateOptions): Promise<RunSummary> {
 			}
 
 			if (!prior) {
-				if (dep.addedBy === "user") {
-					summary.installed.push({ id, title: entry.title, version: entry.version });
-				} else {
+				if (dep.addedBy !== "user") {
 					summary.autoAdded.push(id);
+				} else if (dep.disabledAtVersion) {
+					// Carried a disabledAtVersion marker but resolved above it: a newer
+					// version shipped, so it comes back. Report as re-enabled, not a fresh install.
+					summary.reEnabled.push({ id, title: entry.title, version: entry.version });
+				} else {
+					summary.installed.push({ id, title: entry.title, version: entry.version });
 				}
 			} else if (prior.version !== entry.version) {
 				summary.updated.push({
@@ -182,7 +195,7 @@ export async function runUpdate(opts: UpdateOptions): Promise<RunSummary> {
 		// partial-progress tally so that notice tells admins how far it got.
 		if (err && typeof err === "object") {
 			(err as { context?: string }).context =
-				`Aborted after ${summary.updated.length} updated, ${summary.installed.length} installed (lockfile saved; rerun to resume)`;
+				`Aborted after ${summary.updated.length} updated, ${summary.installed.length} installed, ${summary.reEnabled.length} re-enabled (lockfile saved; rerun to resume)`;
 		}
 		throw err;
 	}
@@ -212,10 +225,22 @@ export function buildUpdateBlocks(
 			blocks.push(block);
 		}
 	}
+	if (summary.reEnabled.length) {
+		blocks.push("## Re-enabled (newer version)");
+		for (const r of summary.reEnabled) {
+			blocks.push(`• ${r.title} (\`${r.id}\`)  ${r.version}`);
+		}
+	}
 	if (summary.installed.length) {
 		blocks.push("## Newly installed");
 		for (const i of summary.installed) {
 			blocks.push(`• ${i.title} (\`${i.id}\`)  ${i.version}`);
+		}
+	}
+	if (summary.newlyDisabled.length) {
+		blocks.push("## 🗑️ Disabled");
+		for (const d of summary.newlyDisabled) {
+			blocks.push(`• ${d.title} (\`${d.id}\`)  disabled at ${d.version}`);
 		}
 	}
 	if (summary.deletedZips.length) {
@@ -232,6 +257,7 @@ function printSummary(summary: RunSummary, gameVersion: string, lock: Lockfile, 
 	log.info(`  game version: ${gameVersion}`);
 	log.info(`  mods tracked: ${Object.keys(lock.mods).length}`);
 	log.info(`  installed:    ${summary.installed.length}`);
+	log.info(`  re-enabled:   ${summary.reEnabled.length}`);
 	log.info(`  updated:      ${summary.updated.length}`);
 	log.info(`  unchanged:    ${summary.unchanged.length}`);
 	log.info(`  cached <1h:   ${skippedCount}`);
