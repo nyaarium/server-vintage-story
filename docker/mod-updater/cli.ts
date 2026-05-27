@@ -1,7 +1,6 @@
 #!/usr/bin/env bun
 import { runAdd } from "./commands/add";
 import { runInstall } from "./commands/install";
-import { runMigrate } from "./commands/migrate";
 import { runOutdated } from "./commands/outdated";
 import { runRemove } from "./commands/remove";
 import { runUpdate } from "./commands/update";
@@ -20,7 +19,6 @@ Commands:
   add <url>            Add a mod to config and install it
                          --lock-to <version>   Pin to a specific version
   remove <id>          Remove a mod from config; cascades unused auto-deps
-  migrate              Convert old-format mods.json5 to new config + lockfile
 
 Environment:
   GAME_VERSION         Current game version (required for all commands)`;
@@ -101,10 +99,6 @@ async function main(): Promise<void> {
 				process.exit(2);
 			}
 			await runRemove({ id, gameVersion });
-			break;
-		}
-		case "migrate": {
-			runMigrate({ gameVersion });
 			break;
 		}
 		default: {
