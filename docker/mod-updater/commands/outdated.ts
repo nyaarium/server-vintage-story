@@ -4,7 +4,7 @@ import { isModUpdaterError } from "../lib/errors";
 import { listExistingZipIds, sleep, zipExistsFor } from "../lib/downloader";
 import { readLockfile } from "../lib/lockfile";
 import { log } from "../lib/logger";
-import { buildDepTree, findAutoDepsToPrune, isLockEntryFresh, resolveVersion } from "../lib/resolver";
+import { buildDepTree, depsOrphanedByDisable, findAutoDepsToPrune, isDisabledAtVersion, isLockEntryFresh, resolveVersion } from "../lib/resolver";
 import { fetchModPage } from "../lib/scraper";
 
 export interface OutdatedOptions {
@@ -54,6 +54,7 @@ export async function runOutdated(opts: OutdatedOptions): Promise<OutdatedSummar
 	const cacheUsable = !opts.force && oldLock !== null && oldLock._gameVersion === opts.gameVersion;
 	const now = Date.now();
 	const skipped: string[] = [];
+	const disabledUserMods = new Set<string>();
 
 	let fetchCount = 0;
 	for (const id of depIds) {
@@ -81,6 +82,11 @@ export async function runOutdated(opts: OutdatedOptions): Promise<OutdatedSummar
 				summary.warnings.push({ id, message: resolved.warning });
 			}
 
+			if (isDisabledAtVersion(dep.disabledAtVersion, resolved.targetVersion.version)) {
+				disabledUserMods.add(id);
+				continue;
+			}
+
 			if (!prior) {
 				summary.wouldInstall.push({
 					id,
@@ -106,8 +112,20 @@ export async function runOutdated(opts: OutdatedOptions): Promise<OutdatedSummar
 		}
 	}
 
+	// Disabled mods, and any auto-dep now wanted only by them, are withheld from every
+	// preview section so nothing about a still-disabled mod reaches the channel.
+	const orphanedByDisable = new Set(depsOrphanedByDisable(deps, disabledUserMods));
+	const withheld = new Set<string>([...disabledUserMods, ...orphanedByDisable]);
+	for (const id of orphanedByDisable) delete deps[id];
+	summary.wouldInstall = summary.wouldInstall.filter((c) => !withheld.has(c.id));
+	summary.wouldUpdate = summary.wouldUpdate.filter((c) => !withheld.has(c.id));
+	summary.unchanged = summary.unchanged.filter((id) => !withheld.has(id));
+	// Drop withheld mods' warnings too: a disabled mod's "below-current" note must not
+	// inflate the fallback count, and a fetch failure on one must not flip hasFailures.
+	summary.warnings = summary.warnings.filter((w) => !withheld.has(w.id));
+
 	if (oldLock) {
-		summary.wouldAutoRemove = findAutoDepsToPrune(oldLock, deps);
+		summary.wouldAutoRemove = findAutoDepsToPrune(oldLock, deps).filter((id) => !withheld.has(id));
 	}
 
 	const trackedIds = new Set<string>(depIds);
@@ -129,7 +147,7 @@ export async function runOutdated(opts: OutdatedOptions): Promise<OutdatedSummar
 		summary.wouldAutoRemove.length > 0 ||
 		summary.wouldOrphanPrune.length > 0;
 
-	printReport(summary, opts.gameVersion, skipped.length);
+	printReport(summary, opts.gameVersion, skipped.length, disabledUserMods.size);
 
 	// Post when a valid discord-config.json5 is present and there is something
 	// worth reporting: pending changes, or fetch/resolve failures (errors).
@@ -193,7 +211,7 @@ export function buildOutdatedBlocks(
 	return blocks;
 }
 
-function printReport(summary: OutdatedSummary, gameVersion: string, skippedCount: number): void {
+function printReport(summary: OutdatedSummary, gameVersion: string, skippedCount: number, disabledCount: number): void {
 	log.section(`Plan for game ${gameVersion}:`);
 
 	if (summary.wouldInstall.length) {
@@ -232,6 +250,7 @@ function printReport(summary: OutdatedSummary, gameVersion: string, skippedCount
 	log.info(`  update:       ${summary.wouldUpdate.length}`);
 	log.info(`  unchanged:    ${summary.unchanged.length}`);
 	log.info(`  cached <1h:   ${skippedCount}`);
+	log.info(`  disabled:     ${disabledCount}`);
 	log.info(`  auto-remove:  ${summary.wouldAutoRemove.length}`);
 	log.info(`  orphan-prune: ${summary.wouldOrphanPrune.length}`);
 	log.info(`  warnings:     ${summary.warnings.length}`);

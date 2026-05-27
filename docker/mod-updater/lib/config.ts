@@ -7,6 +7,10 @@ export interface ModConfigEntry {
 	url: string;
 	requires?: string[];
 	lockToVersion?: string;
+	// Known-bad version. The mod stays disabled (zip deleted, not installed) while the
+	// best resolvable version is still this one or older, and auto-enables once a newer
+	// version is published.
+	disabledAtVersion?: string;
 }
 
 export interface ModsConfig {
@@ -47,10 +51,15 @@ function validateEntry(id: string, entry: unknown): ModConfigEntry {
 		throw new ConfigError(`[${id}] 'lockToVersion' must be a string`, id);
 	}
 
+	if (e.disabledAtVersion !== undefined && typeof e.disabledAtVersion !== "string") {
+		throw new ConfigError(`[${id}] 'disabledAtVersion' must be a string`, id);
+	}
+
 	return {
 		url: normalizeUrl(e.url),
 		...(e.requires ? { requires: (e.requires as string[]).map(normalizeUrl) } : {}),
 		...(e.lockToVersion ? { lockToVersion: e.lockToVersion as string } : {}),
+		...(e.disabledAtVersion ? { disabledAtVersion: e.disabledAtVersion as string } : {}),
 	};
 }
 

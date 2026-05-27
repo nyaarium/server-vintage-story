@@ -9,6 +9,7 @@ export interface ResolvedDep {
 	id: string;
 	url: string;
 	lockToVersion?: string;
+	disabledAtVersion?: string;
 	addedBy: string;
 	requiredBy: string[];
 }
@@ -21,6 +22,7 @@ export function buildDepTree(config: ModsConfig): Record<string, ResolvedDep> {
 			id,
 			url: entry.url,
 			lockToVersion: entry.lockToVersion,
+			disabledAtVersion: entry.disabledAtVersion,
 			addedBy: "user",
 			requiredBy: [],
 		};
@@ -168,6 +170,36 @@ export function buildLockEntry(
 // skip the page fetch for a mod whose locked entry is recent, still matches its
 // config (same url and pin state), and whose zip is already on disk.
 export const REFETCH_TTL_MS = 60 * 60 * 1000; // 1 hour
+
+// A mod marked disabledAtVersion stays disabled while the best resolvable version is
+// still that known-bad version or older; it re-enables the moment a newer one ships.
+// Note compareVersions ignores pre-release suffixes, so a "-pre"/"-rc" bump to the same
+// major.minor.patch does not count as newer.
+export function isDisabledAtVersion(disabledAtVersion: string | undefined, resolvedVersion: string): boolean {
+	if (!disabledAtVersion) return false;
+	return compareVersions(resolvedVersion, disabledAtVersion) <= 0;
+}
+
+// A disabled mod stops contributing its requires. Returns the auto-dep ids now wanted
+// only by disabled mods (every parent is disabled), so they can be uninstalled. Mods
+// added directly by the user (addedBy "user") are never returned.
+export function depsOrphanedByDisable(deps: Record<string, ResolvedDep>, disabled: Set<string>): string[] {
+	const orphaned = new Set<string>();
+	let changed = true;
+	while (changed) {
+		changed = false;
+		for (const [id, d] of Object.entries(deps)) {
+			if (d.addedBy === "user" || orphaned.has(id)) continue;
+			// A parent is gone if it is a disabled mod or a dep already orphaned this
+			// pass, so a chain of deps collapses once the user mod at its root is disabled.
+			if (d.requiredBy.length > 0 && d.requiredBy.every((parent) => disabled.has(parent) || orphaned.has(parent))) {
+				orphaned.add(id);
+				changed = true;
+			}
+		}
+	}
+	return [...orphaned];
+}
 
 export function isLockEntryFresh(
 	dep: ResolvedDep,

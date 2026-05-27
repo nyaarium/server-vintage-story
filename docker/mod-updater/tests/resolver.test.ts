@@ -6,7 +6,9 @@ import type { ModPage, ModPageVersion } from "../lib/scraper";
 import {
 	buildDepTree,
 	buildLockEntry,
+	depsOrphanedByDisable,
 	findAutoDepsToPrune,
+	isDisabledAtVersion,
 	isLockEntryFresh,
 	REFETCH_TTL_MS,
 	resolveVersion,
@@ -347,5 +349,63 @@ describe("isLockEntryFresh", () => {
 		expect(
 			isLockEntryFresh(d({ lockToVersion: "1.0.0" }), fresh({ matchKind: "pinned", pinned: true, version: "1.0.0" }), true, now),
 		).toBe(true);
+	});
+});
+
+describe("isDisabledAtVersion", () => {
+	test("disabled while the resolved version is the bad one or older", () => {
+		expect(isDisabledAtVersion("1.0.0", "1.0.0")).toBe(true);
+		expect(isDisabledAtVersion("1.0.0", "0.9.9")).toBe(true);
+	});
+
+	test("re-enables once a newer version resolves", () => {
+		expect(isDisabledAtVersion("1.0.0", "1.0.1")).toBe(false);
+		expect(isDisabledAtVersion("1.0.0", "2.0.0")).toBe(false);
+	});
+
+	test("absent field is never disabled", () => {
+		expect(isDisabledAtVersion(undefined, "0.0.1")).toBe(false);
+	});
+
+	test("pre-release suffixes are ignored (compareVersions drops them)", () => {
+		// documents the known limitation: a -pre/-rc bump to the same x.y.z stays disabled
+		expect(isDisabledAtVersion("1.0.0", "1.0.0-rc.1")).toBe(true);
+		expect(isDisabledAtVersion("1.0.0-pre.1", "1.0.0")).toBe(true);
+	});
+});
+
+describe("depsOrphanedByDisable", () => {
+	const tree = (): Record<string, ResolvedDep> => ({
+		parentA: dep("parentA", "https://mods.vintagestory.at/parentA"),
+		parentB: dep("parentB", "https://mods.vintagestory.at/parentB"),
+		shared: dep("shared", "https://mods.vintagestory.at/shared", { addedBy: "dep-of:parentA", requiredBy: ["parentA", "parentB"] }),
+		onlyA: dep("onlyA", "https://mods.vintagestory.at/onlyA", { addedBy: "dep-of:parentA", requiredBy: ["parentA"] }),
+	});
+
+	test("returns deps wanted only by disabled mods", () => {
+		expect(depsOrphanedByDisable(tree(), new Set(["parentA"]))).toEqual(["onlyA"]);
+	});
+
+	test("keeps a dep still wanted by an enabled mod", () => {
+		// shared is also required by parentB (enabled), so disabling parentA alone keeps it
+		expect(depsOrphanedByDisable(tree(), new Set(["parentA"]))).not.toContain("shared");
+	});
+
+	test("orphans the shared dep once all its parents are disabled", () => {
+		expect(depsOrphanedByDisable(tree(), new Set(["parentA", "parentB"])).sort()).toEqual(["onlyA", "shared"]);
+	});
+
+	test("never returns a directly user-added mod", () => {
+		expect(depsOrphanedByDisable(tree(), new Set(["parentA", "parentB"]))).not.toContain("parentA");
+	});
+
+	test("cascades transitively through a dep chain", () => {
+		const chain: Record<string, ResolvedDep> = {
+			root: dep("root", "https://mods.vintagestory.at/root"),
+			mid: dep("mid", "https://mods.vintagestory.at/mid", { addedBy: "dep-of:root", requiredBy: ["root"] }),
+			leaf: dep("leaf", "https://mods.vintagestory.at/leaf", { addedBy: "dep-of:mid", requiredBy: ["mid"] }),
+		};
+		// disabling root orphans mid, which in turn orphans leaf
+		expect(depsOrphanedByDisable(chain, new Set(["root"])).sort()).toEqual(["leaf", "mid"]);
 	});
 });

@@ -1,11 +1,11 @@
 import { readConfig } from "../lib/config";
 import { DiscordNotifier, modLabel } from "../lib/discord";
 import { isModUpdaterError } from "../lib/errors";
-import { downloadZip, pruneOrphans, sleep, zipExistsFor } from "../lib/downloader";
+import { deleteZip, downloadZip, pruneOrphans, sleep, zipExistsFor } from "../lib/downloader";
 import type { Lockfile, LockMod } from "../lib/lockfile";
 import { emptyLockfile, readLockfile, removeMod, upsertMod, writeLockfile } from "../lib/lockfile";
 import { log } from "../lib/logger";
-import { buildDepTree, buildLockEntry, isLockEntryFresh, resolveVersion } from "../lib/resolver";
+import { buildDepTree, buildLockEntry, depsOrphanedByDisable, isDisabledAtVersion, isLockEntryFresh, resolveVersion } from "../lib/resolver";
 import { fetchModPage } from "../lib/scraper";
 import { matchesExactly, matchesMinor } from "../lib/version";
 
@@ -60,6 +60,7 @@ export async function runUpdate(opts: UpdateOptions): Promise<RunSummary> {
 	const cacheUsable = !opts.force && oldLock !== null && oldLock._gameVersion === opts.gameVersion;
 	const now = Date.now();
 	const skipped: string[] = [];
+	const disabledUserMods = new Set<string>();
 
 	let fetchCount = 0;
 	let downloadCount = 0;
@@ -92,6 +93,19 @@ export async function runUpdate(opts: UpdateOptions): Promise<RunSummary> {
 			if (resolved.warning) {
 				summary.warnings.push({ id, message: resolved.warning });
 				log.warn(`  ${resolved.warning}`);
+			}
+
+			if (isDisabledAtVersion(dep.disabledAtVersion, resolved.targetVersion.version)) {
+				// Known-bad version still current: keep this mod disabled. Delete any
+				// installed zip so the game cannot load it, drop it from the lockfile, and
+				// stay silent. It re-enables (under "Newly installed") only once a newer
+				// version resolves above disabledAtVersion.
+				if (deleteZip(id)) log.info(`  removed ${id}.zip`);
+				removeMod(newLock, id);
+				writeLockfile(newLock);
+				disabledUserMods.add(id);
+				log.info(`  ${dep.id} disabled at ${dep.disabledAtVersion} (latest ${resolved.targetVersion.version})`);
+				continue;
 			}
 
 			const entry: LockMod = buildLockEntry(dep, resolved, page);
@@ -128,6 +142,21 @@ export async function runUpdate(opts: UpdateOptions): Promise<RunSummary> {
 			writeLockfile(newLock);
 		}
 
+		// A disabled mod stops pulling its requires, so any auto-dep now wanted only by
+		// disabled mods is uninstalled here, silently (same treatment as the disabled mod).
+		const orphanedByDisable = depsOrphanedByDisable(deps, disabledUserMods);
+		for (const id of orphanedByDisable) {
+			if (deleteZip(id)) log.info(`  removed ${id}.zip (dep of disabled mod)`);
+			if (newLock.mods[id]) {
+				summary.autoRemoved.push(id);
+				removeMod(newLock, id);
+			}
+			delete deps[id];
+		}
+		// Disabled mods and their orphaned deps must add no noise: drop their resolve warnings.
+		const withheld = new Set<string>([...disabledUserMods, ...orphanedByDisable]);
+		summary.warnings = summary.warnings.filter((w) => !withheld.has(w.id));
+
 		for (const id of Object.keys(newLock.mods)) {
 			if (!deps[id]) {
 				const removed = newLock.mods[id];
@@ -160,7 +189,7 @@ export async function runUpdate(opts: UpdateOptions): Promise<RunSummary> {
 
 	for (const block of buildUpdateBlocks(summary, (id) => oldLock?.mods[id]?.title)) notifier.post(block);
 	await notifier.finalize();
-	printSummary(summary, opts.gameVersion, newLock, skipped.length);
+	printSummary(summary, opts.gameVersion, newLock, skipped.length, disabledUserMods.size);
 
 	return summary;
 }
@@ -198,7 +227,7 @@ export function buildUpdateBlocks(
 	return blocks;
 }
 
-function printSummary(summary: RunSummary, gameVersion: string, lock: Lockfile, skippedCount: number): void {
+function printSummary(summary: RunSummary, gameVersion: string, lock: Lockfile, skippedCount: number, disabledCount: number): void {
 	log.section("Summary");
 	log.info(`  game version: ${gameVersion}`);
 	log.info(`  mods tracked: ${Object.keys(lock.mods).length}`);
@@ -209,6 +238,7 @@ function printSummary(summary: RunSummary, gameVersion: string, lock: Lockfile, 
 	log.info(`  auto-added:   ${summary.autoAdded.length}`);
 	log.info(`  auto-removed: ${summary.autoRemoved.length}`);
 	log.info(`  orphan zips:  ${summary.deletedZips.length}`);
+	log.info(`  disabled:     ${disabledCount}`);
 	log.info(`  warnings:     ${summary.warnings.length}`);
 
 	const pinned: string[] = [];
