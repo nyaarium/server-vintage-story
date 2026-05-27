@@ -17,6 +17,7 @@ export interface LockMod {
 	requiredBy: string[];
 	pinned: boolean;
 	matchKind: MatchKind;
+	fetchedAt?: string; // ISO time this mod's page was last resolved; drives the 1h refetch skip. Absent on pre-existing lockfiles, which are then treated as stale.
 }
 
 export interface Lockfile {

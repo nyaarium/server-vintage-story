@@ -5,7 +5,7 @@ import { downloadZip, pruneOrphans, sleep, zipExistsFor } from "../lib/downloade
 import type { Lockfile, LockMod } from "../lib/lockfile";
 import { emptyLockfile, readLockfile, removeMod, upsertMod, writeLockfile } from "../lib/lockfile";
 import { log } from "../lib/logger";
-import { buildDepTree, buildLockEntry, resolveVersion } from "../lib/resolver";
+import { buildDepTree, buildLockEntry, isLockEntryFresh, resolveVersion } from "../lib/resolver";
 import { fetchModPage } from "../lib/scraper";
 import { matchesExactly, matchesMinor } from "../lib/version";
 
@@ -21,13 +21,21 @@ interface RunSummary {
 
 export interface UpdateOptions {
 	gameVersion: string;
+	force?: boolean; // bypass the 1h refetch cache and re-resolve every mod
 }
 
 export async function runUpdate(opts: UpdateOptions): Promise<RunSummary> {
 	const config = readConfig();
 	const oldLock = readLockfile();
+	// Clone the mods map rather than share oldLock's reference: pruning newLock below
+	// must not mutate oldLock, which we still read afterward for removed-mod titles.
 	const newLock: Lockfile = oldLock
-		? { ...oldLock, _gameVersion: opts.gameVersion, _resolvedAt: new Date().toISOString() }
+		? {
+				_lockVersion: oldLock._lockVersion,
+				_gameVersion: opts.gameVersion,
+				_resolvedAt: new Date().toISOString(),
+				mods: { ...oldLock.mods },
+			}
 		: emptyLockfile(opts.gameVersion);
 
 	const deps = buildDepTree(config);
@@ -46,18 +54,34 @@ export async function runUpdate(opts: UpdateOptions): Promise<RunSummary> {
 
 	log.section(`Resolving ${depIds.length} mods for game ${opts.gameVersion}...`);
 
+	// Re-resolving every mod hits the mod DB once per mod. Skip that fetch when the
+	// locked entry is recent (< 1h), still matches its config, and its zip is present.
+	// A game-version change or --force invalidates the whole cache.
+	const cacheUsable = !opts.force && oldLock !== null && oldLock._gameVersion === opts.gameVersion;
+	const now = Date.now();
+	const skipped: string[] = [];
+
 	let fetchCount = 0;
 	let downloadCount = 0;
 	try {
 		for (const id of depIds) {
 			const dep = deps[id];
+			const prior = oldLock?.mods[id];
+
+			if (cacheUsable && isLockEntryFresh(dep, prior, zipExistsFor(id), now)) {
+				// requiredBy/addedBy can shift from edits to other mods, so refresh
+				// them from the current dep tree even when reusing the locked version.
+				newLock.mods[id] = { ...prior!, addedBy: dep.addedBy, requiredBy: dep.requiredBy.slice().sort() };
+				skipped.push(id);
+				continue;
+			}
+
 			if (fetchCount > 0) await sleep(1000);
 			fetchCount++;
 
 			log.info(`→ ${dep.id}`);
 
 			const page = await fetchModPage(dep.url);
-			const prior = oldLock?.mods[id];
 			const resolved = resolveVersion({
 				dep,
 				page,
@@ -136,7 +160,7 @@ export async function runUpdate(opts: UpdateOptions): Promise<RunSummary> {
 
 	for (const block of buildUpdateBlocks(summary, (id) => oldLock?.mods[id]?.title)) notifier.post(block);
 	await notifier.finalize();
-	printSummary(summary, opts.gameVersion, newLock);
+	printSummary(summary, opts.gameVersion, newLock, skipped.length);
 
 	return summary;
 }
@@ -174,13 +198,14 @@ export function buildUpdateBlocks(
 	return blocks;
 }
 
-function printSummary(summary: RunSummary, gameVersion: string, lock: Lockfile): void {
+function printSummary(summary: RunSummary, gameVersion: string, lock: Lockfile, skippedCount: number): void {
 	log.section("Summary");
 	log.info(`  game version: ${gameVersion}`);
 	log.info(`  mods tracked: ${Object.keys(lock.mods).length}`);
 	log.info(`  installed:    ${summary.installed.length}`);
 	log.info(`  updated:      ${summary.updated.length}`);
 	log.info(`  unchanged:    ${summary.unchanged.length}`);
+	log.info(`  cached <1h:   ${skippedCount}`);
 	log.info(`  auto-added:   ${summary.autoAdded.length}`);
 	log.info(`  auto-removed: ${summary.autoRemoved.length}`);
 	log.info(`  orphan zips:  ${summary.deletedZips.length}`);

@@ -13,8 +13,10 @@ const USAGE = `Usage: bun cli.ts <command> [args]
 
 Commands:
   update               Re-resolve all mods, download changes, write lockfile
+                         --force               Re-fetch even mods resolved < 1h ago
   install              Apply lockfile to disk (download missing zips, prune orphans)
   outdated             Show pending changes without writing anything (exit 1 if changes)
+                         --force               Re-fetch even mods resolved < 1h ago
   add <url>            Add a mod to config and install it
                          --lock-to <version>   Pin to a specific version
   remove <id>          Remove a mod from config; cascades unused auto-deps
@@ -44,6 +46,13 @@ function parseFlag(args: string[], flag: string): string | undefined {
 	return value;
 }
 
+function hasFlag(args: string[], flag: string): boolean {
+	const idx = args.indexOf(flag);
+	if (idx === -1) return false;
+	args.splice(idx, 1);
+	return true;
+}
+
 async function main(): Promise<void> {
 	const [, , command, ...rest] = process.argv;
 
@@ -56,7 +65,9 @@ async function main(): Promise<void> {
 
 	switch (command) {
 		case "update": {
-			await runUpdate({ gameVersion });
+			const args = [...rest];
+			const force = hasFlag(args, "--force");
+			await runUpdate({ gameVersion, force });
 			break;
 		}
 		case "install": {
@@ -64,7 +75,9 @@ async function main(): Promise<void> {
 			break;
 		}
 		case "outdated": {
-			const result = await runOutdated({ gameVersion });
+			const args = [...rest];
+			const force = hasFlag(args, "--force");
+			const result = await runOutdated({ gameVersion, force });
 			if (result.hasChanges) process.exitCode = 1;
 			break;
 		}

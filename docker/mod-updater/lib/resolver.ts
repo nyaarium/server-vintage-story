@@ -160,5 +160,33 @@ export function buildLockEntry(
 		requiredBy: dep.requiredBy.slice().sort(),
 		pinned: !!dep.lockToVersion,
 		matchKind,
+		fetchedAt: new Date().toISOString(),
 	};
+}
+
+// Mods are re-resolved against the mod DB on every run. To be kind to the site,
+// skip the page fetch for a mod whose locked entry is recent, still matches its
+// config (same url and pin state), and whose zip is already on disk.
+export const REFETCH_TTL_MS = 60 * 60 * 1000; // 1 hour
+
+export function isLockEntryFresh(
+	dep: ResolvedDep,
+	prior: LockMod | undefined,
+	zipPresent: boolean,
+	now: number,
+): boolean {
+	if (!prior || !prior.fetchedAt) return false;
+	if (prior.url !== dep.url) return false;
+	// Only cache settled matches. A "below"/"any" fallback means no build for the
+	// current game version exists yet, so re-check every run: that is exactly the
+	// state we poll for, and caching it would hide a newly published compatible
+	// build for up to an hour.
+	if (prior.matchKind !== "exact" && prior.matchKind !== "pinned") return false;
+	// A pin added, removed, or retargeted (including an unsatisfied pin still on its
+	// fallback version) must force a re-resolve so we keep chasing the wanted version.
+	const lockedPin = prior.pinned ? prior.version : null;
+	if ((dep.lockToVersion ?? null) !== lockedPin) return false;
+	if (!zipPresent) return false;
+	const age = now - Date.parse(prior.fetchedAt);
+	return age >= 0 && age < REFETCH_TTL_MS;
 }

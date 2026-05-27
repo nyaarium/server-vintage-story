@@ -1,14 +1,15 @@
 import { readConfig } from "../lib/config";
 import { DiscordNotifier, modLabel } from "../lib/discord";
 import { isModUpdaterError } from "../lib/errors";
-import { listExistingZipIds, sleep } from "../lib/downloader";
+import { listExistingZipIds, sleep, zipExistsFor } from "../lib/downloader";
 import { readLockfile } from "../lib/lockfile";
 import { log } from "../lib/logger";
-import { buildDepTree, findAutoDepsToPrune, resolveVersion } from "../lib/resolver";
+import { buildDepTree, findAutoDepsToPrune, isLockEntryFresh, resolveVersion } from "../lib/resolver";
 import { fetchModPage } from "../lib/scraper";
 
 export interface OutdatedOptions {
 	gameVersion: string;
+	force?: boolean; // bypass the 1h refetch cache and re-check every mod
 }
 
 export interface PlannedChange {
@@ -47,15 +48,28 @@ export async function runOutdated(opts: OutdatedOptions): Promise<OutdatedSummar
 
 	log.section(`Checking ${depIds.length} mods against ${opts.gameVersion}...`);
 
+	// Same 1h refetch skip as `update`: avoid re-checking a mod whose locked entry is
+	// recent, still matches its config, and whose zip is on disk. `outdated` does not
+	// write the lockfile, so freshness here reflects the last `update` run.
+	const cacheUsable = !opts.force && oldLock !== null && oldLock._gameVersion === opts.gameVersion;
+	const now = Date.now();
+	const skipped: string[] = [];
+
 	let fetchCount = 0;
 	for (const id of depIds) {
 		const dep = deps[id];
+		const prior = oldLock?.mods[id];
+
+		if (cacheUsable && isLockEntryFresh(dep, prior, zipExistsFor(id), now)) {
+			skipped.push(id);
+			continue;
+		}
+
 		if (fetchCount > 0) await sleep(1000);
 		fetchCount++;
 
 		try {
 			const page = await fetchModPage(dep.url);
-			const prior = oldLock?.mods[id];
 			const resolved = resolveVersion({
 				dep,
 				page,
@@ -115,7 +129,7 @@ export async function runOutdated(opts: OutdatedOptions): Promise<OutdatedSummar
 		summary.wouldAutoRemove.length > 0 ||
 		summary.wouldOrphanPrune.length > 0;
 
-	printReport(summary, opts.gameVersion);
+	printReport(summary, opts.gameVersion, skipped.length);
 
 	// Post when a valid discord-config.json5 is present and there is something
 	// worth reporting: pending changes, or fetch/resolve failures (errors).
@@ -179,7 +193,7 @@ export function buildOutdatedBlocks(
 	return blocks;
 }
 
-function printReport(summary: OutdatedSummary, gameVersion: string): void {
+function printReport(summary: OutdatedSummary, gameVersion: string, skippedCount: number): void {
 	log.section(`Plan for game ${gameVersion}:`);
 
 	if (summary.wouldInstall.length) {
@@ -217,6 +231,7 @@ function printReport(summary: OutdatedSummary, gameVersion: string): void {
 	log.info(`  install:      ${summary.wouldInstall.length}`);
 	log.info(`  update:       ${summary.wouldUpdate.length}`);
 	log.info(`  unchanged:    ${summary.unchanged.length}`);
+	log.info(`  cached <1h:   ${skippedCount}`);
 	log.info(`  auto-remove:  ${summary.wouldAutoRemove.length}`);
 	log.info(`  orphan-prune: ${summary.wouldOrphanPrune.length}`);
 	log.info(`  warnings:     ${summary.warnings.length}`);

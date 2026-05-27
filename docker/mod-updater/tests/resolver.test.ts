@@ -7,6 +7,8 @@ import {
 	buildDepTree,
 	buildLockEntry,
 	findAutoDepsToPrune,
+	isLockEntryFresh,
+	REFETCH_TTL_MS,
 	resolveVersion,
 	type ResolvedDep,
 } from "../lib/resolver";
@@ -283,5 +285,67 @@ describe("buildLockEntry", () => {
 		expect(() =>
 			buildLockEntry(d, { id: "m", targetVersion: target, matchKind: "exact", warning: null }, p),
 		).toThrow();
+	});
+
+	test("stamps fetchedAt", () => {
+		const d = dep("m", "https://example/m");
+		const target = ver("1.0.0", ["1.22.0"]);
+		const before = Date.now();
+		const entry = buildLockEntry(d, { id: "m", targetVersion: target, matchKind: "exact", warning: null }, page("M", [target]));
+		expect(entry.fetchedAt).toBeDefined();
+		expect(Date.parse(entry.fetchedAt!)).toBeGreaterThanOrEqual(before);
+	});
+});
+
+describe("isLockEntryFresh", () => {
+	const now = Date.parse("2026-05-26T12:00:00.000Z");
+	const URL = "https://mods.vintagestory.at/x";
+	const minsAgo = (m: number) => new Date(now - m * 60 * 1000).toISOString();
+	const d = (extra: Partial<ResolvedDep> = {}) => dep("x", URL, extra);
+	const fresh = (over: Partial<LockMod> = {}) => lockMod({ url: URL, fetchedAt: minsAgo(10), ...over });
+
+	test("fresh when recent, config matches, zip present", () => {
+		expect(isLockEntryFresh(d(), fresh(), true, now)).toBe(true);
+	});
+
+	test("stale once past the 1h TTL", () => {
+		expect(isLockEntryFresh(d(), fresh({ fetchedAt: minsAgo(61) }), true, now)).toBe(false);
+		// exactly at the boundary counts as expired
+		expect(isLockEntryFresh(d(), fresh({ fetchedAt: new Date(now - REFETCH_TTL_MS).toISOString() }), true, now)).toBe(false);
+	});
+
+	test("missing zip forces a refetch", () => {
+		expect(isLockEntryFresh(d(), fresh(), false, now)).toBe(false);
+	});
+
+	test("no prior entry or no fetchedAt (old lockfile) refetches", () => {
+		expect(isLockEntryFresh(d(), undefined, true, now)).toBe(false);
+		expect(isLockEntryFresh(d(), fresh({ fetchedAt: undefined }), true, now)).toBe(false);
+	});
+
+	test("url change forces a refetch", () => {
+		expect(isLockEntryFresh(dep("x", "https://mods.vintagestory.at/moved"), fresh(), true, now)).toBe(false);
+	});
+
+	test("pin added, removed, or retargeted forces a refetch; matching pin stays fresh", () => {
+		expect(isLockEntryFresh(d({ lockToVersion: "1.0.0" }), fresh({ pinned: false }), true, now)).toBe(false);
+		expect(isLockEntryFresh(d(), fresh({ pinned: true, version: "1.0.0" }), true, now)).toBe(false);
+		expect(isLockEntryFresh(d({ lockToVersion: "2.0.0" }), fresh({ pinned: true, version: "1.0.0" }), true, now)).toBe(false);
+		expect(isLockEntryFresh(d({ lockToVersion: "1.0.0" }), fresh({ pinned: true, version: "1.0.0" }), true, now)).toBe(true);
+	});
+
+	test("a future fetchedAt (clock skew) is treated as stale", () => {
+		expect(isLockEntryFresh(d(), fresh({ fetchedAt: minsAgo(-5) }), true, now)).toBe(false);
+	});
+
+	test("below/any fallback is never cached (keeps polling for a compatible build)", () => {
+		expect(isLockEntryFresh(d(), fresh({ matchKind: "below" }), true, now)).toBe(false);
+		expect(isLockEntryFresh(d(), fresh({ matchKind: "any" }), true, now)).toBe(false);
+	});
+
+	test("a satisfied pin (matchKind pinned) stays cacheable", () => {
+		expect(
+			isLockEntryFresh(d({ lockToVersion: "1.0.0" }), fresh({ matchKind: "pinned", pinned: true, version: "1.0.0" }), true, now),
+		).toBe(true);
 	});
 });
