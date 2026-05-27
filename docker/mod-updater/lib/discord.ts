@@ -116,6 +116,12 @@ export function buildErrorBlocks(command: string, reason: string): string[] {
 	return ["## ⚠️ Error", `\`${command || "(no command)"}\` failed:\n${reason}`];
 }
 
+// Renders a mod id with its display title when known: "Title (`id`)". Falls back
+// to the bare id (e.g. a true orphan zip that was never tracked in the lockfile).
+export function modLabel(id: string, title?: string): string {
+	return title && title !== id ? `${title} (\`${id}\`)` : id;
+}
+
 export class DiscordNotifier {
 	private config: DiscordConfig | null = null;
 	private queue: string[] = [];

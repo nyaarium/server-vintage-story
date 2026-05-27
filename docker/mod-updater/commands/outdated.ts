@@ -1,5 +1,5 @@
 import { readConfig } from "../lib/config";
-import { DiscordNotifier } from "../lib/discord";
+import { DiscordNotifier, modLabel } from "../lib/discord";
 import { isModUpdaterError } from "../lib/errors";
 import { listExistingZipIds, sleep } from "../lib/downloader";
 import { readLockfile } from "../lib/lockfile";
@@ -123,7 +123,7 @@ export async function runOutdated(opts: OutdatedOptions): Promise<OutdatedSummar
 	const hasFailures = summary.warnings.some((w) => /failed/i.test(w.message));
 	const notifier = new DiscordNotifier({ title: "# Vintage Story - Updates Available" });
 	if (notifier.enabled && (summary.hasChanges || hasFailures)) {
-		for (const block of buildOutdatedBlocks(summary)) notifier.post(block);
+		for (const block of buildOutdatedBlocks(summary, (id) => oldLock?.mods[id]?.title)) notifier.post(block);
 		await notifier.finalize();
 	}
 
@@ -133,7 +133,10 @@ export async function runOutdated(opts: OutdatedOptions): Promise<OutdatedSummar
 // Builds atomic blocks (section headers + one bullet per entry) for the
 // "updates available" preview. Bullets use "• " so a list split across messages
 // keeps its formatting. matchKind is tagged when not an exact game-version match.
-export function buildOutdatedBlocks(summary: OutdatedSummary): string[] {
+export function buildOutdatedBlocks(
+	summary: OutdatedSummary,
+	titleOf: (id: string) => string | undefined = () => undefined,
+): string[] {
 	const blocks: string[] = [];
 	const tag = (kind: string) => (kind === "exact" ? "" : `  _(${kind})_`);
 
@@ -151,11 +154,14 @@ export function buildOutdatedBlocks(summary: OutdatedSummary): string[] {
 	}
 	if (summary.wouldAutoRemove.length) {
 		blocks.push("## Would remove (unused deps)");
-		for (const id of summary.wouldAutoRemove) blocks.push(`• ${id}`);
+		for (const id of summary.wouldAutoRemove) blocks.push(`• ${modLabel(id, titleOf(id))}`);
 	}
 	if (summary.wouldOrphanPrune.length) {
 		blocks.push("## 🗑️ Would delete orphan zips");
-		for (const id of summary.wouldOrphanPrune) blocks.push(`• ${id}.zip`);
+		for (const id of summary.wouldOrphanPrune) {
+			const title = titleOf(id);
+			blocks.push(`• ${title ? modLabel(id, title) : `${id}.zip`}`);
+		}
 	}
 
 	// Surface fetch/resolve failures explicitly (actionable); collapse the

@@ -1,5 +1,5 @@
 import { readConfig } from "../lib/config";
-import { DiscordNotifier } from "../lib/discord";
+import { DiscordNotifier, modLabel } from "../lib/discord";
 import { isModUpdaterError } from "../lib/errors";
 import { downloadZip, pruneOrphans, sleep, zipExistsFor } from "../lib/downloader";
 import type { Lockfile, LockMod } from "../lib/lockfile";
@@ -134,7 +134,7 @@ export async function runUpdate(opts: UpdateOptions): Promise<RunSummary> {
 		throw err;
 	}
 
-	for (const block of buildUpdateBlocks(summary)) notifier.post(block);
+	for (const block of buildUpdateBlocks(summary, (id) => oldLock?.mods[id]?.title)) notifier.post(block);
 	await notifier.finalize();
 	printSummary(summary, opts.gameVersion, newLock);
 
@@ -144,7 +144,10 @@ export async function runUpdate(opts: UpdateOptions): Promise<RunSummary> {
 // Builds one atomic block per unit so the notifier can pack/split cleanly at
 // section and entry boundaries. Bullets use "• " (not markdown "- ") because a
 // "- " list loses its formatting when a chunk boundary falls mid-list.
-export function buildUpdateBlocks(summary: RunSummary): string[] {
+export function buildUpdateBlocks(
+	summary: RunSummary,
+	titleOf: (id: string) => string | undefined = () => undefined,
+): string[] {
 	const blocks: string[] = [];
 	if (summary.updated.length) {
 		blocks.push("## Updated");
@@ -165,7 +168,7 @@ export function buildUpdateBlocks(summary: RunSummary): string[] {
 	if (summary.deletedZips.length) {
 		blocks.push("## 🗑️ Deleted");
 		for (const id of summary.deletedZips) {
-			blocks.push(`• ${id}`);
+			blocks.push(`• ${modLabel(id, titleOf(id))}`);
 		}
 	}
 	return blocks;

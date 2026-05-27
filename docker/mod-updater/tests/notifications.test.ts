@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { buildOutdatedBlocks } from "../commands/outdated";
 import { buildUpdateBlocks } from "../commands/update";
-import { buildErrorBlocks, MAX_MESSAGE_LEN, packBlocks } from "../lib/discord";
+import { buildErrorBlocks, MAX_MESSAGE_LEN, modLabel, packBlocks } from "../lib/discord";
 
 type Kind = "exact" | "below" | "any" | "pinned";
 const change = (id: string, title: string, from: string | null, to: string, matchKind: Kind = "exact") => ({
@@ -138,5 +138,51 @@ describe("buildErrorBlocks", () => {
 		const blocks = buildErrorBlocks("update", "x".repeat(5000));
 		const msgs = packBlocks(["# Vintage Story - Mod Updater Error", ...blocks]);
 		for (const m of msgs) expect(m.length).toBeLessThanOrEqual(MAX_MESSAGE_LEN);
+	});
+});
+
+describe("modLabel + title resolution", () => {
+	test("modLabel shows title with id when known, bare id otherwise", () => {
+		expect(modLabel("34209", "Butchering Strong Bone Converter")).toBe("Butchering Strong Bone Converter (`34209`)");
+		expect(modLabel("orphanmod")).toBe("orphanmod");
+		expect(modLabel("samename", "samename")).toBe("samename");
+	});
+
+	test("buildUpdateBlocks Deleted uses display names via titleOf", () => {
+		const titleOf = (id: string) =>
+			({ "34183": "XSkills Catchable FotSA Patch", casuariidae: "Fauna of the Stone Age: Casuariidae Plus" })[id];
+		const blocks = buildUpdateBlocks(
+			{
+				installed: [],
+				updated: [],
+				unchanged: [],
+				autoAdded: [],
+				autoRemoved: [],
+				warnings: [],
+				deletedZips: ["casuariidae", "34183", "trueorphan"],
+			},
+			titleOf,
+		);
+		expect(blocks).toContain("• XSkills Catchable FotSA Patch (`34183`)");
+		expect(blocks).toContain("• Fauna of the Stone Age: Casuariidae Plus (`casuariidae`)");
+		expect(blocks).toContain("• trueorphan"); // no title -> bare id
+	});
+
+	test("buildOutdatedBlocks remove/orphan sections use titles, true orphan keeps .zip", () => {
+		const titleOf = (id: string) => (id === "deadlib" ? "Some Dead Lib" : undefined);
+		const blocks = buildOutdatedBlocks(
+			{
+				wouldUpdate: [],
+				wouldInstall: [],
+				unchanged: [],
+				wouldAutoRemove: ["deadlib"],
+				wouldOrphanPrune: ["leftover"],
+				warnings: [],
+				hasChanges: true,
+			},
+			titleOf,
+		);
+		expect(blocks).toContain("• Some Dead Lib (`deadlib`)");
+		expect(blocks).toContain("• leftover.zip"); // unknown -> filename
 	});
 });
