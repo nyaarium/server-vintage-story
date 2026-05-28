@@ -16,6 +16,9 @@
             command: ["bash", "start.sh", "mod-updater", "outdated"],
         },
     },
+    ports: [
+        { port: 42420, protocol: "tcp" },
+    ],
     patterns: {
         ready: "\\[Event\\] Dedicated Server now running",
         playerJoin: "\\[Event\\] (\\S+) .*joins\\.",
