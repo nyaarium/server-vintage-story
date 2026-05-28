@@ -25,5 +25,16 @@ Other settings:
 Create other settings:
 /worldconfigcreate bool allowDeathwaypointing true
 
+Pregenerate chunks around the player:
+	/wgen pregen [radius]
+Regenerate chunks around the player:
+	/wgen regen [radius]
+Regenerate chunks around the world spawn:
+	/wgen regenc [radius]
+Prune minimally touched chunks:
+	/db prune 16 drop confirm
+Check regen queue:
+	/debug chunk queue
+
 Full listing here:
 https://wiki.vintagestory.at/index.php/World_Configuration
