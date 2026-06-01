@@ -2,7 +2,7 @@ FROM ubuntu:noble
 
 
 # Adjust the game version here
-ENV GAME_VERSION="1.22.2"
+ENV GAME_VERSION="1.22.3"
 
 
 RUN apt update -qq && apt install -qq -y locales tzdata ca-certificates && apt clean -y && rm -rf /var/lib/apt/lists/* \
