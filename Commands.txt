@@ -36,5 +36,23 @@ Prune minimally touched chunks:
 Check regen queue:
 	/debug chunk queue
 
+Resetting story locations:
+  ┌───────────────────────┬──────────────────────────┬────────────────────────────────────────────────────┐
+  │       Location        │         Teleport         │                       Reset                        │
+  ├───────────────────────┼──────────────────────────┼────────────────────────────────────────────────────┤
+  │ Resonance Archives    │ /tpstoryloc              │ Float above the entrance doors, /wgen regen 7      │
+  │ (Ch. 1)               │ resonancearchive         │                                                    │
+  ├───────────────────────┼──────────────────────────┼────────────────────────────────────────────────────┤
+  │ The Lazaret (Ch. 2)   │ /tpstoryloc lazaret      │ Float above the solitary window, /wgen regen 1     │
+  ├───────────────────────┼──────────────────────────┼────────────────────────────────────────────────────┤
+  │ Nadiya's village (Ch. │ /tpstoryloc village      │ Float above the tailor shop, /wgen regen 3 (also   │
+  │  2)                   │                          │ restocks the traders)                              │
+  ├───────────────────────┼──────────────────────────┼────────────────────────────────────────────────────┤
+  │ The Devastation       │ /tpstoryloc              │ No documented regen procedure                      │
+  │                       │ devastationarea          │                                                    │
+  ├───────────────────────┼──────────────────────────┼────────────────────────────────────────────────────┤
+  │ Tobias' cave          │ /tpstoryloc tobiascave   │ No documented regen procedure                      │
+  └───────────────────────┴──────────────────────────┴────────────────────────────────────────────────────┘
+
 Full listing here:
 https://wiki.vintagestory.at/index.php/World_Configuration
