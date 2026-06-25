@@ -129,6 +129,66 @@ describe("parseModPage - version range expansion from span.tag", () => {
 	});
 });
 
+describe("parseModPage - retracted releases", () => {
+	// Models the real mods.vintagestory.at markup: a retracted release renders as a
+	// <tr class="retracted"> with no a.mod-dl, followed by its changelog row.
+	const html = `
+		<html><body>
+			<h2><span>x</span><span>Caninae</span></h2>
+			<table class="release-table"><tbody>
+				<tr data-assetid="56949" class="retracted">
+					<td>1.1.7</td>
+					<td>caninae</td>
+					<td><div class="tags"><a class="tag" rel="tag" href="/list/mod?gv[]=1.22.3">1.22.3</a></div></td>
+					<td>0</td>
+					<td><span title="Jun 24th 2026">10 hours ago</span></td>
+					<td><label class="cl-trigger">Show</label></td>
+					<td colspan="2">Release Retracted</td>
+				</tr>
+				<tr>
+					<td colspan="8"><div class="release-changelog"><h4>Retraction Reason:</h4><p>Duplicate upload</p></div></td>
+				</tr>
+				<tr data-assetid="56948">
+					<td>1.1.6</td>
+					<td>caninae</td>
+					<td><a class="tag" rel="tag">1.22.3</a></td>
+					<td>243</td>
+					<td><span title="Jun 24th 2026">10 hours ago</span></td>
+					<td>show</td>
+					<td><a class="mod-dl" href="/download/102972/FotSA-Caninae-v1.1.6.zip">FotSA-Caninae-v1.1.6.zip</a></td>
+				</tr>
+				<tr>
+					<td colspan="7"><div class="release-changelog">1.1.6 Updated for 1.22.3</div></td>
+				</tr>
+			</tbody></table>
+		</body></html>
+	`;
+
+	test("omits the retracted version entirely", () => {
+		const page = parseModPage(html, "about:blank");
+		expect(page.versions.map((v) => v.version)).toEqual(["1.1.6"]);
+	});
+
+	test("the newest emitted version is the real (downloadable) one", () => {
+		const page = parseModPage(html, "about:blank");
+		const top = page.versions[0];
+		expect(top.version).toBe("1.1.6");
+		expect(top.downloadUrl).toBe("https://mods.vintagestory.at/download/102972/FotSA-Caninae-v1.1.6.zip");
+		expect(top.gameVersions).toContain("1.22.3");
+	});
+
+	test("changelog pairing stays aligned (no retraction text leaks into 1.1.6)", () => {
+		const page = parseModPage(html, "about:blank");
+		expect(page.versions[0].changelog).toBe("Updated for 1.22.3");
+		expect(page.versions[0].changelog).not.toContain("Retraction");
+	});
+
+	test("every emitted version still has a downloadUrl", () => {
+		const page = parseModPage(html, "about:blank");
+		for (const v of page.versions) expect(v.downloadUrl).not.toBeNull();
+	});
+});
+
 describe("parseModPage - changelog extraction", () => {
 	test("strips PGP signature blocks", () => {
 		const html = `

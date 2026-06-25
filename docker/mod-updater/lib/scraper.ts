@@ -63,6 +63,12 @@ export function parseModPage(html: string, sourceUrl: string): ModPage {
 		const $infoRow = infoRows[i];
 		const $changelogRow = changelogRows[i];
 
+		// Retracted releases (author pulled them) still render as a row but have no
+		// download link. The mod DB marks them <tr class="retracted">. Skip them here so
+		// they never become a resolution target and we never try to fetch a file that 404s.
+		// `continue` keeps the infoRows/changelogRows index pairing intact for later rows.
+		if (($infoRow.attr("class") || "").split(/\s+/).includes("retracted")) continue;
+
 		const version = $infoRow.find("td").first().text().trim().replace(/^v/, "");
 		if (!version) continue;
 
