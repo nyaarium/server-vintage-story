@@ -191,6 +191,15 @@ export async function runUpdate(opts: UpdateOptions): Promise<RunSummary> {
 		log.err(reason);
 		log.warn("Aborted. Lockfile saved with partial progress; rerun to resume.");
 
+		// Post whatever updated before the failure so partial progress still reaches the
+		// channel. The CLI handler posts the error next, so it lands after these.
+		try {
+			for (const block of buildUpdateBlocks(summary, (id) => oldLock?.mods[id]?.title)) notifier.post(block);
+			await notifier.finalize();
+		} catch {
+			// best effort: a notification failure must not mask the original error
+		}
+
 		// The CLI's top-level handler posts the failure to Discord. Attach the
 		// partial-progress tally so that notice tells admins how far it got.
 		if (err && typeof err === "object") {
